@@ -26,10 +26,11 @@
     "src"
   ],
   "scripts": {
-    "build": "node scripts/build.js",
+    "build": "tsup",
     "typecheck": "tsc",
     "prepublishOnly": "npm run build",
     "lint": "biome check --write",
+    "pretest": "npm run typecheck",
     "test": "node --test src/**/*.test.ts",
     "posttest": "npm run lint",
     "examples": "node src/examples.ts"
@@ -40,6 +41,7 @@
   "devDependencies": {
     "@biomejs/biome": "2.3.5",
     "@types/node": "^24.10.0",
+    "tsup": "^8.5.0",
     "typescript": "^5.7.2"
   }
 }
