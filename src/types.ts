@@ -43,6 +43,15 @@ export interface ParserConfig {
 }
 
 /**
+ * Configuration options for the generator
+ */
+export interface GeneratorConfig {
+  openDelimiter?: string
+  closeDelimiter?: string
+  typeSeparator?: string
+}
+
+/**
  * Result of parsing a string
  */
 export interface ParseResult {

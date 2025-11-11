@@ -16,6 +16,8 @@ console.log(result.entities);
 // ]
 ```
 
+The library focuses on parsing - extracting typed entities from plain strings. Generating tagged strings is trivial (just string interpolation); however, there is a `TaggedStringGenerator` class available as a reference or parent for your own implementation.
+
 ## Installation
 
 ```bash
@@ -69,6 +71,8 @@ result.getAllTypes();                // ['action', 'resource', 'count']
 ```
 
 ### Custom Delimiters
+
+Configure the parser to use different delimiters:
 
 ```typescript
 const parser = new TaggedStringParser({
@@ -156,6 +160,48 @@ The parser is lenient by design:
 - Unclosed tags at end of string are ignored
 - Empty tag content is skipped
 - Invalid config throws on construction
+
+## Generating Tagged Strings
+
+While you can create tagged strings with simple string interpolation, `TaggedStringGenerator` provides a reference implementation:
+
+```typescript
+import { TaggedStringGenerator } from 'tagged-string';
+
+const generator = new TaggedStringGenerator();
+
+// Simple tag generation
+const tag = generator.tag('operation', 'deploy');
+// "[operation:deploy]"
+
+// Or just use template literals
+const message = `[operation:deploy] started with [changes:${5}]`;
+```
+
+The generator is useful when you need to ensure delimiter consistency across a system.
+
+### `TaggedStringGenerator`
+
+```typescript
+constructor(config?: GeneratorConfig)
+```
+
+**Config options:**
+- `openDelimiter` (default: `'['`) - Opening tag delimiter
+- `closeDelimiter` (default: `']'`) - Closing tag delimiter  
+- `typeSeparator` (default: `':'`) - Separator between type and value
+
+```typescript
+tag(type: string, value: unknown): string
+```
+
+Generates a single tagged entity. Values are converted to strings automatically.
+
+```typescript
+embed(message: string, type: string, value: unknown): string
+```
+
+Convenience method that concatenates a message with a generated tag.
 
 ## Examples
 

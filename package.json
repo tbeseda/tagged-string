@@ -1,7 +1,7 @@
 {
   "name": "tagged-string",
   "version": "0.0.1",
-  "description": "Lightweight, zero-dependency TypeScript library for extracting structured entity information from strings using tag-based syntax",
+  "description": "Lightweight, zero-dependency TypeScript library for generating and extracting structured entity information from strings using tag-based syntax",
   "license": "MIT",
   "author": "tbeseda",
   "repository": {

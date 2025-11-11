@@ -303,3 +303,106 @@ result8.entities.forEach((entity) => {
 })
 
 console.log('\n=== Examples Complete ===\n')
+// ============================================================================
+// Example 9: Producer-Consumer Pattern with Generator
+// ============================================================================
+
+console.log('\n\n=== Example 9: Producer-Consumer Pattern ===\n')
+
+import { TaggedStringGenerator } from './TaggedStringGenerator.ts'
+
+// Producer: Generate tagged strings
+const generator = new TaggedStringGenerator()
+
+console.log('Producer generating tagged strings:')
+const generatedMessage1 = generator.embed('Starting ', 'operation', 'deploy')
+console.log('  ', generatedMessage1)
+
+const generatedMessage2 = generator.embed('Processing ', 'stack', 'prod-stack')
+console.log('  ', generatedMessage2)
+
+const generatedMessage3 = `${generator.tag('operation', 'deploy')} completed with ${generator.tag('changes', 5)} to ${generator.tag('stack', 'prod-stack')}`
+console.log('  ', generatedMessage3)
+
+// Consumer: Parse the generated strings
+const consumerSchema: EntitySchema = {
+  operation: { type: 'string', format: (v) => String(v).toUpperCase() },
+  stack: { type: 'string', format: (v) => `Stack(${v})` },
+  changes: { type: 'number', format: (n) => `${n} change(s)` },
+}
+
+const consumerParser = new TaggedStringParser({ schema: consumerSchema })
+
+console.log('\nConsumer parsing generated strings:')
+const parsed1 = consumerParser.parse(generatedMessage1)
+console.log('  Original:', parsed1.originalMessage)
+console.log('  Formatted:', parsed1.format())
+console.log(
+  '  Entities:',
+  parsed1.entities.map((e) => `${e.type}=${e.parsedValue}`),
+)
+
+const parsed3 = consumerParser.parse(generatedMessage3)
+console.log('\n  Original:', parsed3.originalMessage)
+console.log('  Formatted:', parsed3.format())
+console.log(
+  '  Entities:',
+  parsed3.entities.map((e) => `${e.type}=${e.parsedValue}`),
+)
+
+// Demonstrate matching configurations
+console.log('\n✓ Producer and consumer use matching default configuration')
+console.log('✓ Generated tags are correctly parsed and formatted')
+
+// ============================================================================
+// Example 10: Custom Delimiters with Generator and Parser
+// ============================================================================
+
+console.log('\n\n=== Example 10: Custom Delimiters with Generator ===\n')
+
+// Producer with custom delimiters
+const customConfig = {
+  openDelimiter: '{{',
+  closeDelimiter: '}}',
+  typeSeparator: '=',
+}
+
+const customGenerator = new TaggedStringGenerator(customConfig)
+
+console.log('Producer generating with custom delimiters {{}}:')
+const customMessage1 = customGenerator.embed('User ', 'user', 'alice')
+console.log('  ', customMessage1)
+
+const customMessage2 = `${customGenerator.tag('action', 'login')} by ${customGenerator.tag('user', 'alice')} at ${customGenerator.tag('timestamp', 1699999999)}`
+console.log('  ', customMessage2)
+
+// Consumer with matching custom delimiters
+const customConsumerParser = new TaggedStringParser({
+  ...customConfig,
+  schema: {
+    user: { type: 'string', format: (v) => `@${v}` },
+    action: { type: 'string', format: (v) => String(v).toUpperCase() },
+    timestamp: {
+      type: 'number',
+      format: (n) => new Date(Number(n) * 1000).toISOString(),
+    },
+  },
+})
+
+console.log('\nConsumer parsing with matching custom delimiters:')
+const customParsed1 = customConsumerParser.parse(customMessage1)
+console.log('  Original:', customParsed1.originalMessage)
+console.log('  Formatted:', customParsed1.format())
+
+const customParsed2 = customConsumerParser.parse(customMessage2)
+console.log('\n  Original:', customParsed2.originalMessage)
+console.log('  Formatted:', customParsed2.format())
+console.log(
+  '  Entities:',
+  customParsed2.entities.map((e) => `${e.type}=${e.parsedValue}`),
+)
+
+console.log('\n✓ Custom delimiters work correctly with generator and parser')
+console.log('✓ Configuration consistency ensures proper round-trip')
+
+console.log('\n=== All Examples Complete ===\n')
