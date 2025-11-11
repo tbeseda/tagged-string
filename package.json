@@ -5,17 +5,34 @@
   "license": "MIT",
   "author": "tbeseda",
   "type": "module",
-  "main": "./src/TaggedStringParser.ts",
-  "types": "./src/types.ts",
+  "main": "./dist/TaggedStringParser.js",
+  "types": "./dist/TaggedStringParser.d.ts",
   "exports": {
-    ".": "./src/TaggedStringParser.ts",
-    "./types": "./src/types.ts"
+    ".": {
+      "types": "./dist/TaggedStringParser.d.ts",
+      "default": "./dist/TaggedStringParser.js"
+    },
+    "./types": {
+      "types": "./dist/types.d.ts",
+      "default": "./dist/types.js"
+    },
+    "./src": {
+      "types": "./src/types.ts",
+      "default": "./src/TaggedStringParser.ts"
+    }
   },
+  "files": [
+    "dist",
+    "src"
+  ],
   "scripts": {
+    "build": "node scripts/build.js",
+    "typecheck": "tsc",
+    "prepublishOnly": "npm run build",
     "lint": "biome check --write",
     "test": "node --test src/**/*.test.ts",
     "posttest": "npm run lint",
-    "examples": "node --experimental-strip-types src/examples.ts"
+    "examples": "node src/examples.ts"
   },
   "engines": {
     "node": ">=24.0.0"

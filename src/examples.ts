@@ -15,8 +15,8 @@ import type { EntitySchema } from './types.ts'
 console.log('=== Example 1: Basic Usage with String Formatters ===\n')
 
 const basicSchema: EntitySchema = {
-  operation: { type: 'string', format: (v) => v.toUpperCase() },
-  stack: { type: 'string', format: (v) => v.trim() },
+  operation: { type: 'string', format: (v) => String(v).toUpperCase() },
+  stack: { type: 'string', format: (v) => String(v).trim() },
   changes: { type: 'number', format: (n) => `${n} changes` },
   status: 'string', // Shorthand without formatter
 }
@@ -207,7 +207,7 @@ const angleParser = new TaggedStringParser({
   closeDelimiter: '>>',
   typeSeparator: ':',
   schema: {
-    status: { type: 'string', format: (v) => v.toUpperCase() },
+    status: { type: 'string', format: (v) => String(v).toUpperCase() },
   },
 })
 const angleResult = angleParser.parse('Operation <<status:success>> completed')
@@ -256,7 +256,7 @@ result6.entities.forEach((entity) => {
 console.log('\n\n=== Example 7: Accessing Entity Properties ===\n')
 
 const propsSchema: EntitySchema = {
-  price: { type: 'number', format: (n) => `$${n.toFixed(2)}` },
+  price: { type: 'number', format: (n) => `$${Number(n).toFixed(2)}` },
   available: { type: 'boolean', format: (b) => (b ? '✓' : '✗') },
   product: 'string',
 }

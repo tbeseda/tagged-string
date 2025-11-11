@@ -304,7 +304,7 @@ describe('TaggedStringParser', () => {
       const schema: EntitySchema = {
         name: {
           type: 'string',
-          format: (val) => val.toUpperCase(),
+          format: (val) => String(val).toUpperCase(),
         },
       }
       const parser = new TaggedStringParser({ schema })
@@ -371,7 +371,7 @@ describe('TaggedStringParser', () => {
         count: 'number',
         name: {
           type: 'string',
-          format: (val) => val.toUpperCase(),
+          format: (val) => String(val).toUpperCase(),
         },
       }
       const parser = new TaggedStringParser({ schema })
