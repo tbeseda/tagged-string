@@ -5,20 +5,16 @@
   "license": "MIT",
   "author": "tbeseda",
   "type": "module",
-  "main": "./dist/TaggedStringParser.js",
-  "types": "./dist/TaggedStringParser.d.ts",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/TaggedStringParser.d.ts",
-      "default": "./dist/TaggedStringParser.js"
-    },
-    "./types": {
-      "types": "./dist/types.d.ts",
-      "default": "./dist/types.js"
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
     },
     "./src": {
-      "types": "./src/types.ts",
-      "default": "./src/TaggedStringParser.ts"
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
     }
   },
   "files": [

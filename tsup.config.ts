@@ -1,7 +1,7 @@
 import { defineConfig } from 'tsup'
 
 export default defineConfig({
-  entry: ['src/TaggedStringParser.ts', 'src/types.ts'],
+  entry: ['src/index.ts'],
   format: ['esm'],
   dts: true,
   clean: true,
