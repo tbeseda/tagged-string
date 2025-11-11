@@ -1,43 +1,59 @@
-# Project Structure
+---
+inclusion: always
+---
 
-## Directory Layout
+# Architecture & Code Conventions
+
+## File Structure
 
 ```
-.
-├── .kiro/
-│   ├── specs/          # Feature specifications (requirements, design, tasks)
-│   └── steering/       # AI assistant guidance documents
-├── src/
-│   └── types.ts        # Core type definitions and interfaces
-├── dist/               # Compiled output (generated)
-├── TODO.md             # Project task list (keep updated)
-└── tsconfig.json       # TypeScript configuration
+src/
+├── types.ts                 # All type definitions (single source of truth)
+├── TaggedStringParser.ts    # Main parser class
+├── ParseResult.ts           # Result wrapper with utilities
+├── index.ts                 # Public API exports only
+└── *.test.ts                # Tests co-located with implementation
 ```
 
-## Code Organization
+## Core Architecture
 
-### Type Definitions (`src/types.ts`)
+Single-pass parsing: Extract all entities in one iteration, no multiple passes.
 
-Central location for all TypeScript interfaces and types:
-- `PrimitiveType`: Supported primitive types (string, number, boolean)
-- `EntityDefinition`: Entity schema with optional formatter
-- `EntitySchema`: Schema mapping for entity types
-- `Entity`: Parsed entity structure with type, value, parsedValue, formattedValue, inferredType, position
-- `ParserConfig`: Parser configuration options
-- `ParseResult`: Parse result with utility methods
+Lenient by design: Skip malformed tags silently. Never throw during parsing. Return empty results for invalid input.
 
-### Implementation Files (to be created)
+Type-first: Define types in `src/types.ts` before implementation. All public APIs must have complete TypeScript types.
 
-- Parser class implementation
-- ParseResult class implementation
-- Helper functions for type inference and formatting
+## Key Types
 
-## Conventions
+- `Entity`: Parsed entity with `type`, `value`, `parsedValue`, `formattedValue`, `inferredType`, `position`
+- `EntityDefinition`: Schema entry with optional `formatter` function
+- `EntitySchema`: Map of entity type to definition
+- `ParserConfig`: Config with `schema`, `openDelimiter`, `closeDelimiter`
+- `ParseResult`: Wrapper with filtering and reconstruction methods
 
-- All interfaces and types defined before implementation
-- Comprehensive JSDoc comments on public interfaces
-- Single-pass parsing architecture
-- Lenient error handling (skip malformed input, don't throw)
-- Position tracking for all extracted entities
-- Keep TODO.md updated with current tasks and progress
-- Add issues, bugs, and important features to TODO.md when discovered
+## Code Style
+
+JSDoc required: All public methods and interfaces need JSDoc comments.
+
+Position tracking: Every entity must include `{ start, end }` position in original string.
+
+Immutability: Never mutate input strings or config objects.
+
+Class-based: Use classes for parser and result. Pure functions for utilities.
+
+Export control: Only export public API through `src/index.ts`. Internal implementations stay private.
+
+## Error Handling Rules
+
+- Malformed tags → skip silently, continue parsing
+- Unknown entity types → infer type (string/number/boolean)
+- Missing delimiters → return empty result
+- Formatter throws → fall back to original value
+
+## Testing
+
+Co-locate tests: `*.test.ts` files live alongside implementation files.
+
+## Maintenance
+
+Update `TODO.md` when discovering bugs, missing features, or completing major tasks.
