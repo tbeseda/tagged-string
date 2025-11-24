@@ -148,7 +148,7 @@
   - **Property 11: Parser continues after malformed entities**
   - **Validates: Requirements 8.5**
 
-- [ ] 10. Update documentation
+- [x] 10. Update documentation
   - Add delimiter-free mode examples to README
   - Document `delimiters` configuration option
   - Add quoted string examples

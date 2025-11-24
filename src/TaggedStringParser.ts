@@ -8,7 +8,17 @@ import type {
 
 /**
  * TaggedStringParser extracts tagged entities from strings
- * Supports configurable delimiters, schema-based type parsing, and automatic type inference
+ *
+ * Supports two parsing modes:
+ * - Delimited mode: Extract entities surrounded by delimiters (e.g., [key:value])
+ * - Delimiter-free mode: Extract key=value patterns from natural language strings
+ *
+ * Features:
+ * - Configurable delimiters and type separators
+ * - Schema-based type parsing with custom formatters
+ * - Automatic type inference (string, number, boolean)
+ * - Quoted strings with escape sequences (\", \\)
+ * - Lenient error handling (skips malformed entities)
  */
 export class TaggedStringParser {
   private readonly openDelimiter: string
@@ -20,6 +30,14 @@ export class TaggedStringParser {
   /**
    * Create a new TaggedStringParser with optional configuration
    * @param config - Parser configuration options
+   * @param config.delimiters - Unified delimiter configuration:
+   *   - `false` or `[]` enables delimiter-free mode (parse key=value patterns)
+   *   - `[open, close]` uses specified delimiters (e.g., ['{{', '}}'])
+   *   - If omitted, uses openDelimiter and closeDelimiter options
+   * @param config.openDelimiter - Opening tag delimiter (default: '[', legacy option)
+   * @param config.closeDelimiter - Closing tag delimiter (default: ']', legacy option)
+   * @param config.typeSeparator - Separator between type and value (default: ':')
+   * @param config.schema - Entity type definitions with optional formatters
    * @throws Error if configuration is invalid
    */
   constructor(config?: ParserConfig) {

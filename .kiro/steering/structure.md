@@ -4,56 +4,69 @@ inclusion: always
 
 # Architecture & Code Conventions
 
-## File Structure
+## File Organization
+
+All type definitions belong in `src/types.ts` as the single source of truth. Test files use the `*.test.ts` pattern and live alongside their implementation files. Only export public APIs through `src/index.ts` - keep internal implementations private.
 
 ```
 src/
-├── types.ts                 # All type definitions (single source of truth)
+├── types.ts                 # All type definitions
 ├── TaggedStringParser.ts    # Main parser class
 ├── ParseResult.ts           # Result wrapper with utilities
 ├── index.ts                 # Public API exports only
-└── *.test.ts                # Tests co-located with implementation
+└── *.test.ts                # Co-located tests
 ```
 
-## Core Architecture
+## Architectural Principles
 
-Single-pass parsing: Extract all entities in one iteration, no multiple passes.
+**Single-pass parsing**: Process the entire input string once. Never iterate multiple times over the same content.
 
-Lenient by design: Skip malformed tags silently. Never throw during parsing. Return empty results for invalid input.
+**Lenient parsing**: Skip malformed tags silently and continue. Never throw exceptions during parsing. Return empty results for invalid input rather than errors.
 
-Type-first: Define types in `src/types.ts` before implementation. All public APIs must have complete TypeScript types.
+**Type-first development**: Define all types in `src/types.ts` before implementing features. Every public API must have complete TypeScript type annotations.
 
-## Key Types
+**Immutability**: Never mutate input strings, config objects, or parsed results. Return new objects instead.
 
-- `Entity`: Parsed entity with `type`, `value`, `parsedValue`, `formattedValue`, `inferredType`, `position`
-- `EntityDefinition`: Schema entry with optional `formatter` function
-- `EntitySchema`: Map of entity type to definition
-- `ParserConfig`: Config with `schema`, `openDelimiter`, `closeDelimiter`
-- `ParseResult`: Wrapper with filtering and reconstruction methods
+## Core Type Definitions
 
-## Code Style
+When working with the codebase, these are the key types defined in `src/types.ts`:
 
-JSDoc required: All public methods and interfaces need JSDoc comments.
+- `Entity`: Parsed entity containing `type`, `value`, `parsedValue`, `formattedValue`, `inferredType`, and `position` (with `start` and `end` indices)
+- `EntityDefinition`: Schema entry with optional `formatter` function for value transformation
+- `EntitySchema`: Map from entity type string to `EntityDefinition`
+- `ParserConfig`: Configuration object with `schema`, `openDelimiter`, and `closeDelimiter`
+- `ParseResult`: Wrapper class providing filtering and message reconstruction methods
 
-Position tracking: Every entity must include `{ start, end }` position in original string.
+## Code Style Requirements
 
-Immutability: Never mutate input strings or config objects.
+**Documentation**: Add JSDoc comments to all public methods, classes, and interfaces. Include parameter descriptions and return types.
 
-Class-based: Use classes for parser and result. Pure functions for utilities.
+**Position tracking**: Every parsed entity must include `position: { start: number, end: number }` indicating its location in the original string.
 
-Export control: Only export public API through `src/index.ts`. Internal implementations stay private.
+**Class vs function**: Use classes for stateful components (parser, result wrapper). Use pure functions for stateless utilities.
 
-## Error Handling Rules
+**Exports**: Only export through `src/index.ts`. Mark internal implementations as unexported or use private class members.
 
-- Malformed tags → skip silently, continue parsing
-- Unknown entity types → infer type (string/number/boolean)
-- Missing delimiters → return empty result
-- Formatter throws → fall back to original value
+## Error Handling Strategy
 
-## Testing
+The library follows a fail-safe approach:
 
-Co-locate tests: `*.test.ts` files live alongside implementation files.
+- Malformed tags (missing colon, incomplete delimiters) → skip silently, continue parsing
+- Unknown entity types (not in schema) → parse anyway, infer type as string/number/boolean
+- Missing or invalid delimiters → return empty `ParseResult`
+- Formatter function throws → catch exception, use original `parsedValue` as `formattedValue`
 
-## Maintenance
+Never throw exceptions during parsing. Handle all edge cases gracefully.
 
-Update `TODO.md` when discovering bugs, missing features, or completing major tasks.
+## Implementation Guidelines
+
+When adding features or fixing bugs:
+
+1. Define or update types in `src/types.ts` first
+2. Implement the feature following single-pass parsing principles
+3. Add JSDoc comments to public APIs
+4. Ensure position tracking for all parsed entities
+5. Handle errors silently per the fail-safe strategy
+6. Add tests in co-located `*.test.ts` files
+7. Update `TODO.md` if discovering new issues or completing major tasks
+8. Export new public APIs through `src/index.ts` only
