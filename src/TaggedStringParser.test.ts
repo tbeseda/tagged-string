@@ -1955,6 +1955,159 @@ describe('TaggedStringParser', () => {
     })
   })
 
+  describe('property-based tests for escape sequence scope', () => {
+    /**
+     * Feature: delimiter-free-parsing, Property 6: Escape sequences only apply in quoted strings
+     * Validates: Requirements 5.5
+     */
+    test('Property 6: Escape sequences only apply in quoted strings', () => {
+      // Generator for strings that may contain backslashes but NOT quotes
+      // (quotes would trigger quoted string parsing, which is a different code path)
+      const stringWithBackslashesArbitrary = fc
+        .array(fc.constantFrom('\\', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'), {
+          minLength: 1,
+          maxLength: 20,
+        })
+        .map((chars) => chars.join(''))
+        .filter((s) => s.includes('\\') && !/\s/.test(s) && !s.includes('='))
+
+      fc.assert(
+        fc.property(stringWithBackslashesArbitrary, (unquotedValue) => {
+          // Test in delimiter-free mode with unquoted value
+          const parser = new TaggedStringParser({
+            delimiters: false,
+            typeSeparator: '=',
+          })
+
+          const message = `key=${unquotedValue}`
+          const result = parser.parse(message)
+
+          // Property: Backslashes in unquoted text should be treated as literal characters
+          // No escape sequence processing should occur
+          assert.strictEqual(
+            result.entities.length,
+            1,
+            `Should extract one entity from: ${message}`,
+          )
+          assert.strictEqual(
+            result.entities[0].value,
+            unquotedValue,
+            `Backslashes in unquoted value should be literal. Expected: "${unquotedValue}", Got: "${result.entities[0].value}"`,
+          )
+        }),
+        { numRuns: 100 },
+      )
+
+      // Test in delimited mode with unquoted value
+      fc.assert(
+        fc.property(stringWithBackslashesArbitrary, (unquotedValue) => {
+          const parser = new TaggedStringParser({ typeSeparator: '=' })
+
+          const message = `[key=${unquotedValue}]`
+          const result = parser.parse(message)
+
+          // Property: Backslashes in unquoted text should be treated as literal characters
+          assert.strictEqual(
+            result.entities.length,
+            1,
+            `Should extract one entity from: ${message}`,
+          )
+          assert.strictEqual(
+            result.entities[0].value,
+            unquotedValue,
+            `Backslashes in unquoted value (delimited mode) should be literal. Expected: "${unquotedValue}", Got: "${result.entities[0].value}"`,
+          )
+        }),
+        { numRuns: 100 },
+      )
+    })
+
+    test('Property 6 (edge case): Backslash-quote in unquoted text', () => {
+      // Test that \\" in unquoted text is treated as literal backslash followed by quote
+      const parser1 = new TaggedStringParser({
+        delimiters: false,
+        typeSeparator: '=',
+      })
+
+      // In unquoted context, backslashes should be literal
+      const result1 = parser1.parse('key=test\\"value')
+
+      assert.strictEqual(result1.entities.length, 1)
+      assert.strictEqual(
+        result1.entities[0].value,
+        'test\\"value',
+        'Backslash-quote in unquoted value should be literal',
+      )
+
+      // Test in delimited mode
+      const parser2 = new TaggedStringParser({ typeSeparator: '=' })
+      const result2 = parser2.parse('[key=test\\"value]')
+
+      assert.strictEqual(result2.entities.length, 1)
+      assert.strictEqual(
+        result2.entities[0].value,
+        'test\\"value',
+        'Backslash-quote in unquoted value (delimited) should be literal',
+      )
+    })
+
+    test('Property 6 (edge case): Backslash-backslash in unquoted text', () => {
+      // Test that \\\\ in unquoted text is treated as literal backslashes
+      const parser1 = new TaggedStringParser({
+        delimiters: false,
+        typeSeparator: '=',
+      })
+
+      const result1 = parser1.parse('key=path\\\\to\\\\file')
+
+      assert.strictEqual(result1.entities.length, 1)
+      assert.strictEqual(
+        result1.entities[0].value,
+        'path\\\\to\\\\file',
+        'Double backslashes in unquoted value should be literal',
+      )
+
+      // Test in delimited mode
+      const parser2 = new TaggedStringParser({ typeSeparator: '=' })
+      const result2 = parser2.parse('[key=path\\\\to\\\\file]')
+
+      assert.strictEqual(result2.entities.length, 1)
+      assert.strictEqual(
+        result2.entities[0].value,
+        'path\\\\to\\\\file',
+        'Double backslashes in unquoted value (delimited) should be literal',
+      )
+    })
+
+    test('Property 6 (contrast): Escape sequences DO work in quoted strings', () => {
+      // Verify that escape sequences still work in quoted strings (contrast test)
+      const parser1 = new TaggedStringParser({
+        delimiters: false,
+        typeSeparator: '=',
+      })
+
+      // In quoted context, escape sequences should be processed
+      const result1 = parser1.parse('key="test\\"value"')
+
+      assert.strictEqual(result1.entities.length, 1)
+      assert.strictEqual(
+        result1.entities[0].value,
+        'test"value',
+        'Escape sequences should work in quoted strings',
+      )
+
+      // Test backslash-backslash in quoted string
+      const result2 = parser1.parse('key="path\\\\to\\\\file"')
+
+      assert.strictEqual(result2.entities.length, 1)
+      assert.strictEqual(
+        result2.entities[0].value,
+        'path\\to\\file',
+        'Double backslashes should be processed in quoted strings',
+      )
+    })
+  })
+
   describe('property-based tests for delimiter-free parsing', () => {
     /**
      * Feature: delimiter-free-parsing, Property 1: Delimiter-free mode extracts key-value patterns

@@ -117,12 +117,12 @@
   - **Property 7: Quoted keys work in both modes**
   - **Validates: Requirements 4.5**
 
-- [ ] 8. Ensure escape sequences only apply in quoted strings
+- [x] 8. Ensure escape sequences only apply in quoted strings
   - Verify unquoted text with backslashes is not processed
   - Add tests for backslashes in unquoted context
   - _Requirements: 5.5_
 
-- [ ] 8.1 Write property test for escape sequence scope
+- [x] 8.1 Write property test for escape sequence scope
   - **Property 6: Escape sequences only apply in quoted strings**
   - **Validates: Requirements 5.5**
 
