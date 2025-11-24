@@ -18,6 +18,13 @@ export interface EntityDefinition {
 export type EntitySchema = Record<string, PrimitiveType | EntityDefinition>
 
 /**
+ * Delimiter configuration options
+ * - false or []: Enable delimiter-free mode
+ * - [open, close]: Use specified delimiters
+ */
+export type DelimiterConfig = false | [] | [string, string]
+
+/**
  * Parsed entity extracted from a string
  */
 export interface Entity {
@@ -40,6 +47,7 @@ export interface ParserConfig {
   closeDelimiter?: string
   typeSeparator?: string
   schema?: EntitySchema
+  delimiters?: DelimiterConfig
 }
 
 /**

@@ -15,6 +15,7 @@ export class TaggedStringParser {
   private readonly closeDelimiter: string
   private readonly typeSeparator: string
   private readonly schema?: EntitySchema
+  private readonly isDelimiterFree: boolean
 
   /**
    * Create a new TaggedStringParser with optional configuration
@@ -22,9 +23,36 @@ export class TaggedStringParser {
    * @throws Error if configuration is invalid
    */
   constructor(config?: ParserConfig) {
-    // Set defaults
-    this.openDelimiter = config?.openDelimiter ?? '['
-    this.closeDelimiter = config?.closeDelimiter ?? ']'
+    // Resolve delimiter configuration
+    if (config?.delimiters !== undefined) {
+      // delimiters option takes precedence
+      if (
+        config.delimiters === false ||
+        (Array.isArray(config.delimiters) && config.delimiters.length === 0)
+      ) {
+        // Delimiter-free mode
+        this.isDelimiterFree = true
+        this.openDelimiter = ''
+        this.closeDelimiter = ''
+      } else if (
+        Array.isArray(config.delimiters) &&
+        config.delimiters.length === 2
+      ) {
+        // Delimited mode with specified delimiters
+        this.isDelimiterFree = false
+        this.openDelimiter = config.delimiters[0]
+        this.closeDelimiter = config.delimiters[1]
+      } else {
+        // Invalid configuration
+        throw new Error('Invalid delimiters configuration')
+      }
+    } else {
+      // Backward compatible: use individual delimiter options
+      this.isDelimiterFree = false
+      this.openDelimiter = config?.openDelimiter ?? '['
+      this.closeDelimiter = config?.closeDelimiter ?? ']'
+    }
+
     this.typeSeparator = config?.typeSeparator ?? ':'
     this.schema = config?.schema
 
@@ -37,6 +65,11 @@ export class TaggedStringParser {
    * @throws Error if configuration is invalid
    */
   private validateConfig(): void {
+    // Skip delimiter validation in delimiter-free mode
+    if (this.isDelimiterFree) {
+      return
+    }
+
     if (this.openDelimiter === '') {
       throw new Error('Open delimiter cannot be empty')
     }

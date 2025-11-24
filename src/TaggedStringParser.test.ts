@@ -3,6 +3,13 @@ import { describe, test } from 'node:test'
 import { TaggedStringParser } from './TaggedStringParser.ts'
 import type { EntitySchema } from './types.ts'
 
+// Helper type for accessing private properties in tests
+type ParserWithPrivates = {
+  isDelimiterFree: boolean
+  openDelimiter: string
+  closeDelimiter: string
+}
+
 describe('TaggedStringParser', () => {
   describe('basic parsing', () => {
     test('should extract single entity', () => {
@@ -104,6 +111,137 @@ describe('TaggedStringParser', () => {
       assert.throws(
         () =>
           new TaggedStringParser({ openDelimiter: '|', closeDelimiter: '|' }),
+        /Open and close delimiters cannot be the same/,
+      )
+    })
+  })
+
+  describe('delimiter configuration resolution', () => {
+    test('should enable delimiter-free mode with delimiters: false', () => {
+      const parser = new TaggedStringParser({ delimiters: false })
+      // Access private property through type assertion for testing
+      const isDelimiterFree = (parser as unknown as ParserWithPrivates)
+        .isDelimiterFree
+      assert.strictEqual(isDelimiterFree, true)
+    })
+
+    test('should enable delimiter-free mode with delimiters: []', () => {
+      const parser = new TaggedStringParser({ delimiters: [] })
+      const isDelimiterFree = (parser as unknown as ParserWithPrivates)
+        .isDelimiterFree
+      assert.strictEqual(isDelimiterFree, true)
+    })
+
+    test('should enable delimited mode with delimiters: ["[", "]"]', () => {
+      const parser = new TaggedStringParser({ delimiters: ['[', ']'] })
+      const isDelimiterFree = (parser as unknown as ParserWithPrivates)
+        .isDelimiterFree
+      assert.strictEqual(isDelimiterFree, false)
+      const openDelimiter = (parser as unknown as ParserWithPrivates)
+        .openDelimiter
+      const closeDelimiter = (parser as unknown as ParserWithPrivates)
+        .closeDelimiter
+      assert.strictEqual(openDelimiter, '[')
+      assert.strictEqual(closeDelimiter, ']')
+    })
+
+    test('should enable delimited mode with custom delimiters array', () => {
+      const parser = new TaggedStringParser({ delimiters: ['{{', '}}'] })
+      const isDelimiterFree = (parser as unknown as ParserWithPrivates)
+        .isDelimiterFree
+      assert.strictEqual(isDelimiterFree, false)
+      const openDelimiter = (parser as unknown as ParserWithPrivates)
+        .openDelimiter
+      const closeDelimiter = (parser as unknown as ParserWithPrivates)
+        .closeDelimiter
+      assert.strictEqual(openDelimiter, '{{')
+      assert.strictEqual(closeDelimiter, '}}')
+    })
+
+    test('should maintain backward compatibility with openDelimiter/closeDelimiter', () => {
+      const parser = new TaggedStringParser({
+        openDelimiter: '<',
+        closeDelimiter: '>',
+      })
+      const isDelimiterFree = (parser as unknown as ParserWithPrivates)
+        .isDelimiterFree
+      assert.strictEqual(isDelimiterFree, false)
+      const openDelimiter = (parser as unknown as ParserWithPrivates)
+        .openDelimiter
+      const closeDelimiter = (parser as unknown as ParserWithPrivates)
+        .closeDelimiter
+      assert.strictEqual(openDelimiter, '<')
+      assert.strictEqual(closeDelimiter, '>')
+    })
+
+    test('should use default delimiters when no configuration provided', () => {
+      const parser = new TaggedStringParser()
+      const isDelimiterFree = (parser as unknown as ParserWithPrivates)
+        .isDelimiterFree
+      assert.strictEqual(isDelimiterFree, false)
+      const openDelimiter = (parser as unknown as ParserWithPrivates)
+        .openDelimiter
+      const closeDelimiter = (parser as unknown as ParserWithPrivates)
+        .closeDelimiter
+      assert.strictEqual(openDelimiter, '[')
+      assert.strictEqual(closeDelimiter, ']')
+    })
+
+    test('should prioritize delimiters option over individual delimiter options', () => {
+      const parser = new TaggedStringParser({
+        delimiters: ['{{', '}}'],
+        openDelimiter: '<',
+        closeDelimiter: '>',
+      })
+      const openDelimiter = (parser as unknown as ParserWithPrivates)
+        .openDelimiter
+      const closeDelimiter = (parser as unknown as ParserWithPrivates)
+        .closeDelimiter
+      assert.strictEqual(openDelimiter, '{{')
+      assert.strictEqual(closeDelimiter, '}}')
+    })
+
+    test('should prioritize delimiters: false over individual delimiter options', () => {
+      const parser = new TaggedStringParser({
+        delimiters: false,
+        openDelimiter: '[',
+        closeDelimiter: ']',
+      })
+      const isDelimiterFree = (parser as unknown as ParserWithPrivates)
+        .isDelimiterFree
+      assert.strictEqual(isDelimiterFree, true)
+    })
+
+    test('should throw error for invalid delimiters configuration', () => {
+      assert.throws(
+        () =>
+          new TaggedStringParser({
+            delimiters: ['['] as unknown as [string, string],
+          }),
+        /Invalid delimiters configuration/,
+      )
+    })
+
+    test('should throw error for delimiters array with more than 2 elements', () => {
+      assert.throws(
+        () =>
+          new TaggedStringParser({
+            delimiters: ['[', ']', '{'] as unknown as [string, string],
+          }),
+        /Invalid delimiters configuration/,
+      )
+    })
+
+    test('should throw error for empty string delimiters in array', () => {
+      assert.throws(
+        () => new TaggedStringParser({ delimiters: ['', ']'] }),
+        /Open delimiter cannot be empty/,
+      )
+    })
+
+    test('should throw error for same delimiters in array', () => {
+      assert.throws(
+        () => new TaggedStringParser({ delimiters: ['|', '|'] }),
         /Open and close delimiters cannot be the same/,
       )
     })
