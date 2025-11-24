@@ -54,7 +54,7 @@
   - Test empty tokens
   - _Requirements: 2.2, 2.3_
 
-- [ ] 5. Implement delimiter-free parsing algorithm
+- [x] 5. Implement delimiter-free parsing algorithm
   - Create `parseDelimiterFree` method
   - Scan string character-by-character
   - Extract keys (quoted or unquoted)
@@ -64,7 +64,7 @@
   - Skip malformed entities gracefully
   - _Requirements: 1.4, 2.1, 2.2, 2.3, 2.4, 2.5, 8.1, 8.2, 8.3, 8.4, 8.5_
 
-- [ ] 5.1 Write unit tests for delimiter-free parsing
+- [x] 5.1 Write unit tests for delimiter-free parsing
   - Test simple key-value extraction: `"order=1337"`
   - Test multiple entities: `"order=1337 status=pending"`
   - Test mixed with text: `"an order=1337 was placed"`
@@ -73,15 +73,15 @@
   - Test malformed entities are skipped
   - _Requirements: 1.4, 2.1, 2.5, 3.1, 4.1_
 
-- [ ] 5.2 Write property test for delimiter-free key-value extraction
+- [x] 5.2 Write property test for delimiter-free key-value extraction
   - **Property 1: Delimiter-free mode extracts key-value patterns**
   - **Validates: Requirements 1.4, 2.1, 2.5**
 
-- [ ] 5.3 Write property test for whitespace boundaries
+- [x] 5.3 Write property test for whitespace boundaries
   - **Property 2: Whitespace defines entity boundaries**
   - **Validates: Requirements 2.2, 2.3**
 
-- [ ] 5.4 Write property test for type separator usage
+- [x] 5.4 Write property test for type separator usage
   - **Property 3: Type separator is respected**
   - **Validates: Requirements 2.4**
 

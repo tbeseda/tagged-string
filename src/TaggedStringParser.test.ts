@@ -1156,4 +1156,429 @@ describe('TaggedStringParser', () => {
       assert.strictEqual(result2.entities[1].parsedValue, '"user-db"')
     })
   })
+
+  describe('delimiter-free parsing', () => {
+    test('should extract simple key-value: order=1337', () => {
+      const parser = new TaggedStringParser({
+        delimiters: false,
+        typeSeparator: '=',
+      })
+      const result = parser.parse('order=1337')
+
+      assert.strictEqual(result.entities.length, 1)
+      assert.strictEqual(result.entities[0].type, 'order')
+      assert.strictEqual(result.entities[0].value, '1337')
+      assert.strictEqual(result.entities[0].parsedValue, 1337)
+      assert.strictEqual(result.entities[0].inferredType, 'number')
+    })
+
+    test('should extract multiple entities: order=1337 status=pending', () => {
+      const parser = new TaggedStringParser({
+        delimiters: false,
+        typeSeparator: '=',
+      })
+      const result = parser.parse('order=1337 status=pending')
+
+      assert.strictEqual(result.entities.length, 2)
+      assert.strictEqual(result.entities[0].type, 'order')
+      assert.strictEqual(result.entities[0].value, '1337')
+      assert.strictEqual(result.entities[0].parsedValue, 1337)
+      assert.strictEqual(result.entities[1].type, 'status')
+      assert.strictEqual(result.entities[1].value, 'pending')
+      assert.strictEqual(result.entities[1].parsedValue, 'pending')
+    })
+
+    test('should extract entities mixed with text: an order=1337 was placed', () => {
+      const parser = new TaggedStringParser({
+        delimiters: false,
+        typeSeparator: '=',
+      })
+      const result = parser.parse('an order=1337 was placed')
+
+      assert.strictEqual(result.entities.length, 1)
+      assert.strictEqual(result.entities[0].type, 'order')
+      assert.strictEqual(result.entities[0].value, '1337')
+      assert.strictEqual(result.entities[0].parsedValue, 1337)
+    })
+
+    test('should extract quoted values: order="number 42"', () => {
+      const parser = new TaggedStringParser({
+        delimiters: false,
+        typeSeparator: '=',
+      })
+      const result = parser.parse('order="number 42"')
+
+      assert.strictEqual(result.entities.length, 1)
+      assert.strictEqual(result.entities[0].type, 'order')
+      assert.strictEqual(result.entities[0].value, 'number 42')
+      assert.strictEqual(result.entities[0].parsedValue, 'number 42')
+    })
+
+    test('should extract quoted keys: "store order"=42', () => {
+      const parser = new TaggedStringParser({
+        delimiters: false,
+        typeSeparator: '=',
+      })
+      const result = parser.parse('"store order"=42')
+
+      assert.strictEqual(result.entities.length, 1)
+      assert.strictEqual(result.entities[0].type, 'store order')
+      assert.strictEqual(result.entities[0].value, '42')
+      assert.strictEqual(result.entities[0].parsedValue, 42)
+    })
+
+    test('should skip malformed entities with unclosed quoted key', () => {
+      const parser = new TaggedStringParser({
+        delimiters: false,
+        typeSeparator: '=',
+      })
+      const result = parser.parse('"unclosed key=42 valid=123')
+
+      // Should skip the malformed quoted key and find valid entities
+      // After skipping the quote, it will find "key=42" and "valid=123"
+      assert.strictEqual(result.entities.length, 2)
+      assert.strictEqual(result.entities[0].type, 'key')
+      assert.strictEqual(result.entities[0].value, '42')
+      assert.strictEqual(result.entities[1].type, 'valid')
+      assert.strictEqual(result.entities[1].value, '123')
+    })
+
+    test('should skip malformed entities with unclosed quoted value', () => {
+      const parser = new TaggedStringParser({
+        delimiters: false,
+        typeSeparator: '=',
+      })
+      const result = parser.parse('key="unclosed value')
+
+      // Should skip the malformed entity
+      assert.strictEqual(result.entities.length, 0)
+    })
+
+    test('should skip entities with key but no value', () => {
+      const parser = new TaggedStringParser({
+        delimiters: false,
+        typeSeparator: '=',
+      })
+      const result = parser.parse('key= valid=123')
+
+      // Should skip the malformed entity and find the valid one
+      assert.strictEqual(result.entities.length, 1)
+      assert.strictEqual(result.entities[0].type, 'valid')
+    })
+
+    test('should handle custom type separator in delimiter-free mode', () => {
+      const parser = new TaggedStringParser({
+        delimiters: false,
+        typeSeparator: ':',
+      })
+      const result = parser.parse('order:1337 status:pending')
+
+      assert.strictEqual(result.entities.length, 2)
+      assert.strictEqual(result.entities[0].type, 'order')
+      assert.strictEqual(result.entities[0].value, '1337')
+      assert.strictEqual(result.entities[1].type, 'status')
+      assert.strictEqual(result.entities[1].value, 'pending')
+    })
+
+    test('should track positions correctly in delimiter-free mode', () => {
+      const parser = new TaggedStringParser({
+        delimiters: false,
+        typeSeparator: '=',
+      })
+      const result = parser.parse('order=1337 status=pending')
+
+      assert.strictEqual(result.entities[0].position, 0)
+      assert.strictEqual(result.entities[0].endPosition, 10)
+      assert.strictEqual(result.entities[1].position, 11)
+      assert.strictEqual(result.entities[1].endPosition, 25)
+    })
+
+    test('should handle multiple whitespace between entities', () => {
+      const parser = new TaggedStringParser({
+        delimiters: false,
+        typeSeparator: '=',
+      })
+      const result = parser.parse('order=1337    status=pending')
+
+      assert.strictEqual(result.entities.length, 2)
+      assert.strictEqual(result.entities[0].type, 'order')
+      assert.strictEqual(result.entities[1].type, 'status')
+    })
+
+    test('should handle entities at start and end of string', () => {
+      const parser = new TaggedStringParser({
+        delimiters: false,
+        typeSeparator: '=',
+      })
+      const result = parser.parse('first=1 middle text last=2')
+
+      assert.strictEqual(result.entities.length, 2)
+      assert.strictEqual(result.entities[0].type, 'first')
+      assert.strictEqual(result.entities[0].value, '1')
+      assert.strictEqual(result.entities[1].type, 'last')
+      assert.strictEqual(result.entities[1].value, '2')
+    })
+
+    test('should handle quoted key and quoted value together', () => {
+      const parser = new TaggedStringParser({
+        delimiters: false,
+        typeSeparator: '=',
+      })
+      const result = parser.parse('"store order"="number 42"')
+
+      assert.strictEqual(result.entities.length, 1)
+      assert.strictEqual(result.entities[0].type, 'store order')
+      assert.strictEqual(result.entities[0].value, 'number 42')
+    })
+
+    test('should handle escape sequences in quoted values', () => {
+      const parser = new TaggedStringParser({
+        delimiters: false,
+        typeSeparator: '=',
+      })
+      const result = parser.parse('msg="say \\"hello\\""')
+
+      assert.strictEqual(result.entities.length, 1)
+      assert.strictEqual(result.entities[0].type, 'msg')
+      assert.strictEqual(result.entities[0].value, 'say "hello"')
+    })
+
+    test('should handle escape sequences in quoted keys', () => {
+      const parser = new TaggedStringParser({
+        delimiters: false,
+        typeSeparator: '=',
+      })
+      const result = parser.parse('"key\\"name"=value')
+
+      assert.strictEqual(result.entities.length, 1)
+      assert.strictEqual(result.entities[0].type, 'key"name')
+      assert.strictEqual(result.entities[0].value, 'value')
+    })
+  })
+
+  describe('property-based tests for delimiter-free parsing', () => {
+    /**
+     * Feature: delimiter-free-parsing, Property 1: Delimiter-free mode extracts key-value patterns
+     * Validates: Requirements 1.4, 2.1, 2.5
+     */
+    test('Property 1: Delimiter-free mode extracts key-value patterns', () => {
+      // Generator for valid keys (alphanumeric, no whitespace, no separator, no quotes)
+      const keyArbitrary = fc
+        .string({
+          minLength: 1,
+          maxLength: 20,
+        })
+        .filter(
+          (s) =>
+            s.trim().length > 0 &&
+            !s.includes('=') &&
+            !s.includes('"') &&
+            !/\s/.test(s),
+        )
+
+      // Generator for valid values (alphanumeric, no whitespace, no quotes)
+      const valueArbitrary = fc
+        .string({
+          minLength: 1,
+          maxLength: 20,
+        })
+        .filter((s) => s.trim().length > 0 && !s.includes('"') && !/\s/.test(s))
+
+      // Generator for key-value pairs
+      const keyValuePairArbitrary = fc.tuple(keyArbitrary, valueArbitrary)
+
+      // Generator for arrays of key-value pairs
+      const keyValueArrayArbitrary = fc.array(keyValuePairArbitrary, {
+        minLength: 1,
+        maxLength: 5,
+      })
+
+      fc.assert(
+        fc.property(keyValueArrayArbitrary, (pairs) => {
+          const parser = new TaggedStringParser({
+            delimiters: false,
+            typeSeparator: '=',
+          })
+
+          // Build a string with key=value patterns separated by spaces
+          const message = pairs
+            .map(([key, value]) => `${key}=${value}`)
+            .join(' ')
+
+          const result = parser.parse(message)
+
+          // Property: All key-value pairs should be extracted
+          assert.strictEqual(
+            result.entities.length,
+            pairs.length,
+            `Expected ${pairs.length} entities, got ${result.entities.length} from: ${message}`,
+          )
+
+          // Property: Each entity should match the corresponding pair
+          for (let i = 0; i < pairs.length; i++) {
+            const [expectedKey, expectedValue] = pairs[i]
+            const entity = result.entities[i]
+
+            assert.strictEqual(
+              entity.type,
+              expectedKey,
+              `Entity ${i} type mismatch. Expected: ${expectedKey}, Got: ${entity.type}`,
+            )
+            assert.strictEqual(
+              entity.value,
+              expectedValue,
+              `Entity ${i} value mismatch. Expected: ${expectedValue}, Got: ${entity.value}`,
+            )
+          }
+        }),
+        { numRuns: 100 },
+      )
+    })
+
+    /**
+     * Feature: delimiter-free-parsing, Property 2: Whitespace defines entity boundaries
+     * Validates: Requirements 2.2, 2.3
+     */
+    test('Property 2: Whitespace defines entity boundaries', () => {
+      // Generator for valid keys (no whitespace, no separator, no quotes)
+      const keyArbitrary = fc
+        .string({
+          minLength: 1,
+          maxLength: 20,
+        })
+        .filter(
+          (s) =>
+            s.trim().length > 0 &&
+            !s.includes('=') &&
+            !s.includes('"') &&
+            !/\s/.test(s),
+        )
+
+      // Generator for valid values (no whitespace, no quotes)
+      const valueArbitrary = fc
+        .string({
+          minLength: 1,
+          maxLength: 20,
+        })
+        .filter((s) => s.trim().length > 0 && !s.includes('"') && !/\s/.test(s))
+
+      // Generator for whitespace (space, tab, multiple spaces)
+      const whitespaceArbitrary = fc.constantFrom(' ', '  ', '\t', '   ')
+
+      // Generator for key-value pair with surrounding whitespace
+      const keyValueWithWhitespaceArbitrary = fc.tuple(
+        keyArbitrary,
+        valueArbitrary,
+        whitespaceArbitrary,
+        whitespaceArbitrary,
+      )
+
+      fc.assert(
+        fc.property(
+          keyValueWithWhitespaceArbitrary,
+          ([key, value, before, after]) => {
+            const parser = new TaggedStringParser({
+              delimiters: false,
+              typeSeparator: '=',
+            })
+
+            // Build a string with whitespace before and after the entity
+            const message = `${before}${key}=${value}${after}`
+
+            const result = parser.parse(message)
+
+            // Property: Whitespace should define boundaries, entity should be extracted
+            assert.strictEqual(
+              result.entities.length,
+              1,
+              `Expected 1 entity from: "${message}"`,
+            )
+
+            assert.strictEqual(
+              result.entities[0].type,
+              key,
+              `Key mismatch. Expected: ${key}, Got: ${result.entities[0].type}`,
+            )
+            assert.strictEqual(
+              result.entities[0].value,
+              value,
+              `Value mismatch. Expected: ${value}, Got: ${result.entities[0].value}`,
+            )
+          },
+        ),
+        { numRuns: 100 },
+      )
+    })
+
+    /**
+     * Feature: delimiter-free-parsing, Property 3: Type separator is respected
+     * Validates: Requirements 2.4
+     */
+    test('Property 3: Type separator is respected', () => {
+      // Generator that creates separator, key, and value together
+      const testCaseArbitrary = fc
+        .constantFrom(':', '=', '|')
+        .chain((separator) => {
+          // Generator for valid keys (no whitespace, no current separator, no quotes)
+          const keyArbitrary = fc
+            .string({
+              minLength: 1,
+              maxLength: 20,
+            })
+            .filter(
+              (s) =>
+                s.trim().length > 0 &&
+                !s.includes(separator) &&
+                !s.includes('"') &&
+                !/\s/.test(s),
+            )
+
+          // Generator for valid values (no whitespace, no quotes)
+          const valueArbitrary = fc
+            .string({
+              minLength: 1,
+              maxLength: 20,
+            })
+            .filter(
+              (s) => s.trim().length > 0 && !s.includes('"') && !/\s/.test(s),
+            )
+
+          return fc
+            .tuple(keyArbitrary, valueArbitrary)
+            .map(([key, value]) => ({ separator, key, value }))
+        })
+
+      fc.assert(
+        fc.property(testCaseArbitrary, ({ separator, key, value }) => {
+          const parser = new TaggedStringParser({
+            delimiters: false,
+            typeSeparator: separator,
+          })
+
+          const message = `${key}${separator}${value}`
+
+          const result = parser.parse(message)
+
+          // Property: The configured separator should be used to split key and value
+          assert.strictEqual(
+            result.entities.length,
+            1,
+            `Expected 1 entity from: "${message}" with separator "${separator}"`,
+          )
+
+          assert.strictEqual(
+            result.entities[0].type,
+            key,
+            `Key mismatch. Expected: ${key}, Got: ${result.entities[0].type}`,
+          )
+          assert.strictEqual(
+            result.entities[0].value,
+            value,
+            `Value mismatch. Expected: ${value}, Got: ${result.entities[0].value}`,
+          )
+        }),
+        { numRuns: 100 },
+      )
+    })
+  })
 })

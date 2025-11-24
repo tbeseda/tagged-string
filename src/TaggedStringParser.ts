@@ -91,6 +91,11 @@ export class TaggedStringParser {
       return new ParseResult(message, [])
     }
 
+    // Route to appropriate parsing method based on mode
+    if (this.isDelimiterFree) {
+      return this.parseDelimiterFree(message)
+    }
+
     // Escape special regex characters in delimiters
     const escapeRegex = (str: string) =>
       str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -118,6 +123,109 @@ export class TaggedStringParser {
           entities.push(entity)
         }
       }
+    }
+
+    return new ParseResult(message, entities, this.closeDelimiter)
+  }
+
+  /**
+   * Parse a string in delimiter-free mode, extracting key-value patterns
+   * @param message - The string to parse
+   * @returns ParseResult containing original message and extracted entities
+   */
+  private parseDelimiterFree(message: string): ParseResult {
+    const entities: Entity[] = []
+    let pos = 0
+
+    while (pos < message.length) {
+      // Skip whitespace
+      while (pos < message.length && /\s/.test(message[pos])) {
+        pos++
+      }
+
+      if (pos >= message.length) {
+        break
+      }
+
+      // Try to extract key (quoted or unquoted)
+      const keyStart = pos
+      let key: string
+      let keyEnd: number
+
+      if (message[pos] === '"') {
+        // Quoted key
+        const quotedKey = this.extractQuotedString(message, pos)
+        if (!quotedKey) {
+          // Malformed quoted key - skip this character and continue
+          pos++
+          continue
+        }
+        key = quotedKey.content
+        keyEnd = quotedKey.endPosition
+      } else {
+        // Unquoted key - extract until separator or whitespace
+        const unquotedKey = this.extractUnquotedToken(message, pos, [
+          this.typeSeparator,
+        ])
+        if (unquotedKey.content === '') {
+          // No key found - advance and continue
+          pos++
+          continue
+        }
+        key = unquotedKey.content
+        keyEnd = unquotedKey.endPosition
+      }
+
+      // Check for type separator
+      if (keyEnd >= message.length || message[keyEnd] !== this.typeSeparator) {
+        // No separator - this isn't an entity, continue from after the key
+        pos = keyEnd + 1
+        continue
+      }
+
+      // Advance past separator
+      pos = keyEnd + 1
+
+      // Try to extract value (quoted or unquoted)
+      let value: string
+      let valueEnd: number
+
+      if (pos < message.length && message[pos] === '"') {
+        // Quoted value
+        const quotedValue = this.extractQuotedString(message, pos)
+        if (!quotedValue) {
+          // Malformed quoted value - skip this entity
+          continue
+        }
+        value = quotedValue.content
+        valueEnd = quotedValue.endPosition
+      } else {
+        // Unquoted value - extract until whitespace
+        const unquotedValue = this.extractUnquotedToken(message, pos, [])
+        if (unquotedValue.content === '') {
+          // No value found - skip this entity
+          continue
+        }
+        value = unquotedValue.content
+        valueEnd = unquotedValue.endPosition
+      }
+
+      // Create entity
+      const { parsedValue, inferredType } = this.parseValue(key, value)
+      const formattedValue = this.applyFormatter(key, parsedValue)
+
+      entities.push({
+        type: key,
+        value,
+        parsedValue,
+        formattedValue,
+        inferredType,
+        position: keyStart,
+        endPosition: valueEnd,
+      })
+
+      // Update position to continue scanning
+      pos = valueEnd
     }
 
     return new ParseResult(message, entities, this.closeDelimiter)
