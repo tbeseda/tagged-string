@@ -42,13 +42,13 @@
   - **Property 5: Escape sequences are processed**
   - **Validates: Requirements 3.4, 4.3, 5.1, 5.2, 5.3**
 
-- [ ] 4. Implement unquoted token extraction utility
+- [x] 4. Implement unquoted token extraction utility
   - Create `extractUnquotedToken` method
   - Stop at whitespace or specified stop characters
   - Return content and end position
   - _Requirements: 2.2, 2.3_
 
-- [ ] 4.1 Write unit tests for unquoted token extraction
+- [x] 4.1 Write unit tests for unquoted token extraction
   - Test token extraction with whitespace boundaries
   - Test token extraction with stop characters
   - Test empty tokens

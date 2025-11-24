@@ -312,4 +312,41 @@ export class TaggedStringParser {
     // Reached end of string without finding closing quote
     return null
   }
+
+  /**
+   * Extract an unquoted token starting at the given position
+   * Stops at whitespace or any of the specified stop characters
+   * @param message - The string to extract from
+   * @param startPos - The position to start extraction
+   * @param stopChars - Array of characters that should stop extraction
+   * @returns Object with content and endPosition
+   */
+  private extractUnquotedToken(
+    message: string,
+    startPos: number,
+    stopChars: string[],
+  ): { content: string; endPosition: number } {
+    let result = ''
+    let pos = startPos
+
+    while (pos < message.length) {
+      const char = message[pos]
+
+      // Check if we hit whitespace
+      if (/\s/.test(char)) {
+        break
+      }
+
+      // Check if we hit a stop character
+      if (stopChars.includes(char)) {
+        break
+      }
+
+      // Add character to result
+      result += char
+      pos += 1
+    }
+
+    return { content: result, endPosition: pos }
+  }
 }
