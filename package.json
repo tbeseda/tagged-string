@@ -1,6 +1,6 @@
 {
   "name": "tagged-string",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Extract structured data from strings using tag-based syntax",
   "license": "MIT",
   "author": "tbeseda",
