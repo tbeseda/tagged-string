@@ -1356,6 +1356,136 @@ describe('TaggedStringParser', () => {
     })
   })
 
+  describe('parse method routing', () => {
+    test('should route to delimiter-free mode when delimiters: false', () => {
+      const parser = new TaggedStringParser({
+        delimiters: false,
+        typeSeparator: '=',
+      })
+      const result = parser.parse('order=1337')
+
+      // Verify it parsed in delimiter-free mode (extracted key=value pattern)
+      assert.strictEqual(result.entities.length, 1)
+      assert.strictEqual(result.entities[0].type, 'order')
+      assert.strictEqual(result.entities[0].value, '1337')
+    })
+
+    test('should route to delimiter-free mode when delimiters: []', () => {
+      const parser = new TaggedStringParser({
+        delimiters: [],
+        typeSeparator: '=',
+      })
+      const result = parser.parse('status=pending')
+
+      // Verify it parsed in delimiter-free mode
+      assert.strictEqual(result.entities.length, 1)
+      assert.strictEqual(result.entities[0].type, 'status')
+      assert.strictEqual(result.entities[0].value, 'pending')
+    })
+
+    test('should route to delimited mode when delimiters: ["[", "]"]', () => {
+      const parser = new TaggedStringParser({
+        delimiters: ['[', ']'],
+        typeSeparator: ':',
+      })
+      const result = parser.parse('[operation:OP-123]')
+
+      // Verify it parsed in delimited mode (extracted [type:value] pattern)
+      assert.strictEqual(result.entities.length, 1)
+      assert.strictEqual(result.entities[0].type, 'operation')
+      assert.strictEqual(result.entities[0].value, 'OP-123')
+    })
+
+    test('should route to delimited mode with default configuration', () => {
+      const parser = new TaggedStringParser()
+      const result = parser.parse('[operation:OP-123]')
+
+      // Verify it parsed in delimited mode (default behavior)
+      assert.strictEqual(result.entities.length, 1)
+      assert.strictEqual(result.entities[0].type, 'operation')
+      assert.strictEqual(result.entities[0].value, 'OP-123')
+    })
+
+    test('should route to delimited mode with custom delimiters', () => {
+      const parser = new TaggedStringParser({
+        delimiters: ['{{', '}}'],
+        typeSeparator: '=',
+      })
+      const result = parser.parse('{{order=1337}}')
+
+      // Verify it parsed in delimited mode with custom delimiters
+      assert.strictEqual(result.entities.length, 1)
+      assert.strictEqual(result.entities[0].type, 'order')
+      assert.strictEqual(result.entities[0].value, '1337')
+    })
+
+    test('should return ParseResult in delimiter-free mode', () => {
+      const parser = new TaggedStringParser({ delimiters: false })
+      const result = parser.parse('key=value')
+
+      // Verify it returns a ParseResult instance
+      assert.ok(result)
+      assert.ok(result.entities)
+      assert.ok(result.originalMessage)
+      assert.strictEqual(result.originalMessage, 'key=value')
+    })
+
+    test('should return ParseResult in delimited mode', () => {
+      const parser = new TaggedStringParser()
+      const result = parser.parse('[key:value]')
+
+      // Verify it returns a ParseResult instance
+      assert.ok(result)
+      assert.ok(result.entities)
+      assert.ok(result.originalMessage)
+      assert.strictEqual(result.originalMessage, '[key:value]')
+    })
+
+    test('should not extract delimiter-free patterns in delimited mode', () => {
+      const parser = new TaggedStringParser({
+        delimiters: ['[', ']'],
+        typeSeparator: '=',
+      })
+      const result = parser.parse('order=1337 [status=pending]')
+
+      // Should only extract the delimited entity, not the delimiter-free pattern
+      assert.strictEqual(result.entities.length, 1)
+      assert.strictEqual(result.entities[0].type, 'status')
+      assert.strictEqual(result.entities[0].value, 'pending')
+    })
+
+    test('should treat brackets as regular characters in delimiter-free mode', () => {
+      const parser = new TaggedStringParser({
+        delimiters: false,
+        typeSeparator: '=',
+      })
+      const result = parser.parse('[status=pending] order=1337')
+
+      // In delimiter-free mode, brackets are just regular characters
+      // The parser will extract key-value patterns regardless of brackets
+      assert.strictEqual(result.entities.length, 2)
+      // First entity includes brackets in key/value since they're not special
+      assert.strictEqual(result.entities[0].type, '[status')
+      assert.strictEqual(result.entities[0].value, 'pending]')
+      // Second entity is normal
+      assert.strictEqual(result.entities[1].type, 'order')
+      assert.strictEqual(result.entities[1].value, '1337')
+    })
+
+    test('should handle empty string in both modes', () => {
+      const delimiterFreeParser = new TaggedStringParser({ delimiters: false })
+      const delimitedParser = new TaggedStringParser()
+
+      const result1 = delimiterFreeParser.parse('')
+      const result2 = delimitedParser.parse('')
+
+      assert.strictEqual(result1.entities.length, 0)
+      assert.strictEqual(result1.originalMessage, '')
+      assert.strictEqual(result2.entities.length, 0)
+      assert.strictEqual(result2.originalMessage, '')
+    })
+  })
+
   describe('property-based tests for delimiter-free parsing', () => {
     /**
      * Feature: delimiter-free-parsing, Property 1: Delimiter-free mode extracts key-value patterns

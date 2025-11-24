@@ -85,13 +85,13 @@
   - **Property 3: Type separator is respected**
   - **Validates: Requirements 2.4**
 
-- [ ] 6. Update main parse method to route by mode
+- [x] 6. Update main parse method to route by mode
   - Check `isDelimiterFree` flag
   - Route to `parseDelimiterFree` or existing `parse` logic
   - Ensure both paths return consistent `ParseResult`
   - _Requirements: 1.4, 1.5_
 
-- [ ] 6.1 Write unit tests for parse method routing
+- [x] 6.1 Write unit tests for parse method routing
   - Test delimiter-free mode routes correctly
   - Test delimited mode routes correctly
   - Test both modes return ParseResult
