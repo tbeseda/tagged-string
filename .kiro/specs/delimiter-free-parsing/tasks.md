@@ -22,7 +22,7 @@
   - Test invalid configuration errors
   - _Requirements: 1.1, 1.2, 1.3, 1.5, 7.1, 7.2, 7.3, 7.4, 7.5_
 
-- [ ] 3. Implement quoted string extraction utility
+- [x] 3. Implement quoted string extraction utility
   - Create `extractQuotedString` method that handles escape sequences
   - Process `\"` as literal quote
   - Process `\\` as literal backslash
@@ -30,7 +30,7 @@
   - Handle backslash at end of string
   - _Requirements: 3.4, 4.3, 5.1, 5.2, 5.4_
 
-- [ ] 3.1 Write unit tests for quoted string extraction
+- [x] 3.1 Write unit tests for quoted string extraction
   - Test basic quoted string extraction
   - Test escape sequence processing (`\"` and `\\`)
   - Test unclosed quotes return null
@@ -38,7 +38,7 @@
   - Test quotes with spaces and special characters
   - _Requirements: 3.4, 4.3, 5.1, 5.2, 5.4_
 
-- [ ] 3.2 Write property test for escape sequence processing
+- [x] 3.2 Write property test for escape sequence processing
   - **Property 5: Escape sequences are processed**
   - **Validates: Requirements 3.4, 4.3, 5.1, 5.2, 5.3**
 

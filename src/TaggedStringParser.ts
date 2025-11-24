@@ -262,4 +262,54 @@ export class TaggedStringParser {
     // No formatter - convert to string
     return String(parsedValue)
   }
+
+  /**
+   * Extract a quoted string starting at the given position
+   * Processes escape sequences: \" becomes " and \\ becomes \
+   * @param message - The string to extract from
+   * @param startPos - The position of the opening quote
+   * @returns Object with content and endPosition, or null if unclosed
+   */
+  private extractQuotedString(
+    message: string,
+    startPos: number,
+  ): { content: string; endPosition: number } | null {
+    // Verify we're starting at a quote
+    if (message[startPos] !== '"') {
+      return null
+    }
+
+    let result = ''
+    let pos = startPos + 1
+
+    while (pos < message.length) {
+      const char = message[pos]
+
+      if (char === '\\') {
+        // Check if there's a next character
+        if (pos + 1 < message.length) {
+          const nextChar = message[pos + 1]
+          // Process escape sequences for quote and backslash
+          if (nextChar === '"' || nextChar === '\\') {
+            result += nextChar
+            pos += 2
+            continue
+          }
+        }
+        // Backslash at end or before non-escapable char - treat as literal
+        result += char
+        pos += 1
+      } else if (char === '"') {
+        // Found closing quote
+        return { content: result, endPosition: pos + 1 }
+      } else {
+        // Regular character
+        result += char
+        pos += 1
+      }
+    }
+
+    // Reached end of string without finding closing quote
+    return null
+  }
 }

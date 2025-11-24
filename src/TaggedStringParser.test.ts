@@ -1,5 +1,6 @@
 import assert from 'node:assert'
 import { describe, test } from 'node:test'
+import * as fc from 'fast-check'
 import { TaggedStringParser } from './TaggedStringParser.ts'
 import type { EntitySchema } from './types.ts'
 
@@ -627,6 +628,279 @@ describe('TaggedStringParser', () => {
       // Second entity
       assert.strictEqual(result.entities[1].position, 29)
       assert.strictEqual(result.entities[1].endPosition, 41)
+    })
+  })
+
+  describe('quoted string extraction', () => {
+    // Helper to access private method for testing
+    type ParserWithExtractQuotedString = {
+      extractQuotedString: (
+        message: string,
+        startPos: number,
+      ) => { content: string; endPosition: number } | null
+    }
+
+    test('should extract basic quoted string', () => {
+      const parser = new TaggedStringParser()
+      const extract = (
+        parser as unknown as ParserWithExtractQuotedString
+      ).extractQuotedString.bind(parser)
+
+      const result = extract('"hello world"', 0)
+      assert.notStrictEqual(result, null)
+      assert.strictEqual(result?.content, 'hello world')
+      assert.strictEqual(result?.endPosition, 13)
+    })
+
+    test('should extract quoted string with spaces', () => {
+      const parser = new TaggedStringParser()
+      const extract = (
+        parser as unknown as ParserWithExtractQuotedString
+      ).extractQuotedString.bind(parser)
+
+      const result = extract('"store order"', 0)
+      assert.notStrictEqual(result, null)
+      assert.strictEqual(result?.content, 'store order')
+      assert.strictEqual(result?.endPosition, 13)
+    })
+
+    test('should extract quoted string with special characters', () => {
+      const parser = new TaggedStringParser()
+      const extract = (
+        parser as unknown as ParserWithExtractQuotedString
+      ).extractQuotedString.bind(parser)
+
+      const result = extract('"hello:world=test"', 0)
+      assert.notStrictEqual(result, null)
+      assert.strictEqual(result?.content, 'hello:world=test')
+      assert.strictEqual(result?.endPosition, 18)
+    })
+
+    test('should process escaped quote (\\") as literal quote', () => {
+      const parser = new TaggedStringParser()
+      const extract = (
+        parser as unknown as ParserWithExtractQuotedString
+      ).extractQuotedString.bind(parser)
+
+      const result = extract('"say \\"hello\\""', 0)
+      assert.notStrictEqual(result, null)
+      assert.strictEqual(result?.content, 'say "hello"')
+    })
+
+    test('should process escaped backslash (\\\\) as literal backslash', () => {
+      const parser = new TaggedStringParser()
+      const extract = (
+        parser as unknown as ParserWithExtractQuotedString
+      ).extractQuotedString.bind(parser)
+
+      const result = extract('"path\\\\to\\\\file"', 0)
+      assert.notStrictEqual(result, null)
+      assert.strictEqual(result?.content, 'path\\to\\file')
+    })
+
+    test('should process mixed escape sequences', () => {
+      const parser = new TaggedStringParser()
+      const extract = (
+        parser as unknown as ParserWithExtractQuotedString
+      ).extractQuotedString.bind(parser)
+
+      const result = extract('"test\\\\\\"mixed\\""', 0)
+      assert.notStrictEqual(result, null)
+      assert.strictEqual(result?.content, 'test\\"mixed"')
+    })
+
+    test('should return null for unclosed quote', () => {
+      const parser = new TaggedStringParser()
+      const extract = (
+        parser as unknown as ParserWithExtractQuotedString
+      ).extractQuotedString.bind(parser)
+
+      const result = extract('"unclosed string', 0)
+      assert.strictEqual(result, null)
+    })
+
+    test('should return null for unclosed quote at end of string', () => {
+      const parser = new TaggedStringParser()
+      const extract = (
+        parser as unknown as ParserWithExtractQuotedString
+      ).extractQuotedString.bind(parser)
+
+      const result = extract('"no closing', 0)
+      assert.strictEqual(result, null)
+    })
+
+    test('should handle backslash at end of quoted string', () => {
+      const parser = new TaggedStringParser()
+      const extract = (
+        parser as unknown as ParserWithExtractQuotedString
+      ).extractQuotedString.bind(parser)
+
+      const result = extract('"ends with\\"', 0)
+      assert.strictEqual(result, null) // Unclosed because backslash escapes the closing quote
+    })
+
+    test('should handle backslash before non-escapable character', () => {
+      const parser = new TaggedStringParser()
+      const extract = (
+        parser as unknown as ParserWithExtractQuotedString
+      ).extractQuotedString.bind(parser)
+
+      const result = extract('"test\\nvalue"', 0)
+      assert.notStrictEqual(result, null)
+      assert.strictEqual(result?.content, 'test\\nvalue') // Backslash treated as literal
+    })
+
+    test('should extract quoted string from middle of larger string', () => {
+      const parser = new TaggedStringParser()
+      const extract = (
+        parser as unknown as ParserWithExtractQuotedString
+      ).extractQuotedString.bind(parser)
+
+      const result = extract('key="quoted value" rest', 4)
+      assert.notStrictEqual(result, null)
+      assert.strictEqual(result?.content, 'quoted value')
+      assert.strictEqual(result?.endPosition, 18)
+    })
+
+    test('should return null when not starting at a quote', () => {
+      const parser = new TaggedStringParser()
+      const extract = (
+        parser as unknown as ParserWithExtractQuotedString
+      ).extractQuotedString.bind(parser)
+
+      const result = extract('not a quote', 0)
+      assert.strictEqual(result, null)
+    })
+
+    test('should handle empty quoted string', () => {
+      const parser = new TaggedStringParser()
+      const extract = (
+        parser as unknown as ParserWithExtractQuotedString
+      ).extractQuotedString.bind(parser)
+
+      const result = extract('""', 0)
+      assert.notStrictEqual(result, null)
+      assert.strictEqual(result?.content, '')
+      assert.strictEqual(result?.endPosition, 2)
+    })
+  })
+
+  describe('property-based tests for quoted string extraction', () => {
+    // Helper to access private method for testing
+    type ParserWithExtractQuotedString = {
+      extractQuotedString: (
+        message: string,
+        startPos: number,
+      ) => { content: string; endPosition: number } | null
+    }
+
+    /**
+     * Feature: delimiter-free-parsing, Property 5: Escape sequences are processed
+     * Validates: Requirements 3.4, 4.3, 5.1, 5.2, 5.3
+     */
+    test('Property 5: Escape sequences are processed correctly', () => {
+      const parser = new TaggedStringParser()
+      const extract = (
+        parser as unknown as ParserWithExtractQuotedString
+      ).extractQuotedString.bind(parser)
+
+      // Generator for strings that may contain quotes and backslashes
+      const contentArbitrary = fc.string({
+        minLength: 0,
+        maxLength: 50,
+      })
+
+      fc.assert(
+        fc.property(contentArbitrary, (content) => {
+          // Build a properly escaped quoted string
+          // Replace \ with \\ and " with \"
+          const escaped = content.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+          const quotedString = `"${escaped}"`
+
+          // Extract the quoted string
+          const result = extract(quotedString, 0)
+
+          // Property: extraction should succeed and return the original content
+          assert.notStrictEqual(
+            result,
+            null,
+            `Failed to extract quoted string: ${quotedString}`,
+          )
+          assert.strictEqual(
+            result?.content,
+            content,
+            `Escape sequences not processed correctly. Expected: ${content}, Got: ${result?.content}`,
+          )
+
+          // Property: endPosition should be at the closing quote
+          assert.strictEqual(
+            result?.endPosition,
+            quotedString.length,
+            'End position should be at closing quote',
+          )
+        }),
+        { numRuns: 100 },
+      )
+    })
+
+    test('Property 5 (edge case): Escaped quotes within content', () => {
+      const parser = new TaggedStringParser()
+      const extract = (
+        parser as unknown as ParserWithExtractQuotedString
+      ).extractQuotedString.bind(parser)
+
+      // Generator specifically for strings with quotes
+      const stringWithQuotesArbitrary = fc
+        .array(fc.constantFrom('"', '\\', 'a', 'b', ' ', ':', '=', 'x', 'y'), {
+          minLength: 0,
+          maxLength: 20,
+        })
+        .map((chars) => chars.join(''))
+
+      fc.assert(
+        fc.property(stringWithQuotesArbitrary, (content) => {
+          // Escape the content properly
+          const escaped = content.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+          const quotedString = `"${escaped}"`
+
+          const result = extract(quotedString, 0)
+
+          // Should successfully extract and unescape
+          assert.notStrictEqual(result, null)
+          assert.strictEqual(result?.content, content)
+        }),
+        { numRuns: 100 },
+      )
+    })
+
+    test('Property 5 (edge case): Backslashes at various positions', () => {
+      const parser = new TaggedStringParser()
+      const extract = (
+        parser as unknown as ParserWithExtractQuotedString
+      ).extractQuotedString.bind(parser)
+
+      // Generator for strings with backslashes
+      const stringWithBackslashesArbitrary = fc
+        .array(fc.constantFrom('\\', 'a', 'b', 'c', ' ', 'd', 'e'), {
+          minLength: 0,
+          maxLength: 20,
+        })
+        .map((chars) => chars.join(''))
+
+      fc.assert(
+        fc.property(stringWithBackslashesArbitrary, (content) => {
+          // Properly escape backslashes and quotes
+          const escaped = content.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+          const quotedString = `"${escaped}"`
+
+          const result = extract(quotedString, 0)
+
+          // Should successfully extract with backslashes preserved
+          assert.notStrictEqual(result, null)
+          assert.strictEqual(result?.content, content)
+        }),
+        { numRuns: 100 },
+      )
     })
   })
 
