@@ -126,25 +126,25 @@
   - **Property 6: Escape sequences only apply in quoted strings**
   - **Validates: Requirements 5.5**
 
-- [ ] 9. Verify backward compatibility
+- [x] 9. Verify backward compatibility
   - Run all existing tests
   - Ensure delimited mode behavior is unchanged
   - Verify schema and formatters work in both modes
   - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5_
 
-- [ ] 9.1 Write property test for delimited mode isolation
+- [x] 9.1 Write property test for delimited mode isolation
   - **Property 8: Delimited mode ignores delimiter-free patterns**
   - **Validates: Requirements 6.2**
 
-- [ ] 9.2 Write property test for backward compatibility
+- [x] 9.2 Write property test for backward compatibility
   - **Property 9: Backward compatibility is maintained**
   - **Validates: Requirements 6.3**
 
-- [ ] 9.3 Write property test for schema and formatter parity
+- [x] 9.3 Write property test for schema and formatter parity
   - **Property 10: Schema and formatters work in both modes**
   - **Validates: Requirements 6.4, 6.5**
 
-- [ ] 9.4 Write property test for error recovery
+- [x] 9.4 Write property test for error recovery
   - **Property 11: Parser continues after malformed entities**
   - **Validates: Requirements 8.5**
 

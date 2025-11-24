@@ -2108,6 +2108,953 @@ describe('TaggedStringParser', () => {
     })
   })
 
+  describe('property-based tests for backward compatibility', () => {
+    /**
+     * Feature: delimiter-free-parsing, Property 8: Delimited mode ignores delimiter-free patterns
+     * Validates: Requirements 6.2
+     */
+    test('Property 8: Delimited mode ignores delimiter-free patterns', () => {
+      // Generator for valid keys (no whitespace, no separator, no quotes, no delimiters)
+      const keyArbitrary = fc
+        .string({
+          minLength: 1,
+          maxLength: 20,
+        })
+        .filter(
+          (s) =>
+            s.trim().length > 0 &&
+            !s.includes('=') &&
+            !s.includes(':') &&
+            !s.includes('"') &&
+            !s.includes('[') &&
+            !s.includes(']') &&
+            !/\s/.test(s),
+        )
+
+      // Generator for valid values (no whitespace, no quotes, no delimiters)
+      const valueArbitrary = fc
+        .string({
+          minLength: 1,
+          maxLength: 20,
+        })
+        .filter(
+          (s) =>
+            s.trim().length > 0 &&
+            !s.includes('"') &&
+            !s.includes('[') &&
+            !s.includes(']') &&
+            !/\s/.test(s),
+        )
+
+      // Generator for key-value pairs
+      const keyValuePairArbitrary = fc.tuple(keyArbitrary, valueArbitrary)
+
+      // Generator for arrays of key-value pairs (delimiter-free patterns)
+      const keyValueArrayArbitrary = fc.array(keyValuePairArbitrary, {
+        minLength: 1,
+        maxLength: 3,
+      })
+
+      fc.assert(
+        fc.property(keyValueArrayArbitrary, (pairs) => {
+          const parser = new TaggedStringParser({
+            delimiters: ['[', ']'],
+            typeSeparator: '=',
+          })
+
+          // Build a string with key=value patterns (delimiter-free syntax)
+          // These should NOT be extracted in delimited mode
+          const message = pairs
+            .map(([key, value]) => `${key}=${value}`)
+            .join(' ')
+
+          const result = parser.parse(message)
+
+          // Property: Delimited mode should NOT extract delimiter-free patterns
+          assert.strictEqual(
+            result.entities.length,
+            0,
+            `Delimited mode should not extract delimiter-free patterns. Found ${result.entities.length} entities from: ${message}`,
+          )
+        }),
+        { numRuns: 100 },
+      )
+    })
+
+    test('Property 8 (edge case): Delimited mode extracts only delimited entities', () => {
+      // Generator for valid keys
+      const keyArbitrary = fc
+        .string({
+          minLength: 1,
+          maxLength: 20,
+        })
+        .filter(
+          (s) =>
+            s.trim().length > 0 &&
+            !s.includes('=') &&
+            !s.includes(':') &&
+            !s.includes('"') &&
+            !s.includes('[') &&
+            !s.includes(']') &&
+            !/\s/.test(s),
+        )
+
+      // Generator for valid values
+      const valueArbitrary = fc
+        .string({
+          minLength: 1,
+          maxLength: 20,
+        })
+        .filter(
+          (s) =>
+            s.trim().length > 0 &&
+            !s.includes('"') &&
+            !s.includes('[') &&
+            !s.includes(']') &&
+            !/\s/.test(s),
+        )
+
+      fc.assert(
+        fc.property(
+          keyArbitrary,
+          valueArbitrary,
+          keyArbitrary,
+          valueArbitrary,
+          (key1, value1, key2, value2) => {
+            const parser = new TaggedStringParser({
+              delimiters: ['[', ']'],
+              typeSeparator: '=',
+            })
+
+            // Mix delimiter-free pattern with delimited entity
+            const message = `${key1}=${value1} [${key2}=${value2}]`
+
+            const result = parser.parse(message)
+
+            // Property: Should only extract the delimited entity, not the delimiter-free pattern
+            assert.strictEqual(
+              result.entities.length,
+              1,
+              `Should extract only delimited entity from: ${message}`,
+            )
+
+            assert.strictEqual(
+              result.entities[0].type,
+              key2,
+              `Should extract delimited entity key. Expected: ${key2}, Got: ${result.entities[0].type}`,
+            )
+            assert.strictEqual(
+              result.entities[0].value,
+              value2,
+              `Should extract delimited entity value. Expected: ${value2}, Got: ${result.entities[0].value}`,
+            )
+          },
+        ),
+        { numRuns: 100 },
+      )
+    })
+
+    /**
+     * Feature: delimiter-free-parsing, Property 9: Backward compatibility is maintained
+     * Validates: Requirements 6.3
+     */
+    test('Property 9: Backward compatibility is maintained', () => {
+      // Generator for valid keys (no separator, no quotes, no delimiters)
+      const keyArbitrary = fc
+        .string({
+          minLength: 1,
+          maxLength: 20,
+        })
+        .filter(
+          (s) =>
+            s.trim().length > 0 &&
+            !s.includes(':') &&
+            !s.includes('=') &&
+            !s.includes('"') &&
+            !s.includes('[') &&
+            !s.includes(']') &&
+            !/\s/.test(s),
+        )
+
+      // Generator for valid values (no quotes, no delimiters)
+      const valueArbitrary = fc
+        .string({
+          minLength: 1,
+          maxLength: 20,
+        })
+        .filter(
+          (s) =>
+            s.trim().length > 0 &&
+            !s.includes('"') &&
+            !s.includes('[') &&
+            !s.includes(']'),
+        )
+
+      // Generator for type separator
+      const separatorArbitrary = fc.constantFrom(':', '=', '|')
+
+      fc.assert(
+        fc.property(
+          keyArbitrary,
+          valueArbitrary,
+          separatorArbitrary,
+          (key, value, separator) => {
+            // Create parser with explicit delimiters (new API)
+            const newParser = new TaggedStringParser({
+              delimiters: ['[', ']'],
+              typeSeparator: separator,
+            })
+
+            // Create parser with old API (backward compatible)
+            const oldParser = new TaggedStringParser({
+              openDelimiter: '[',
+              closeDelimiter: ']',
+              typeSeparator: separator,
+            })
+
+            // Build a delimited message
+            const message = `[${key}${separator}${value}]`
+
+            const newResult = newParser.parse(message)
+            const oldResult = oldParser.parse(message)
+
+            // Property: Both parsers should produce identical results
+            assert.strictEqual(
+              newResult.entities.length,
+              oldResult.entities.length,
+              `Entity count mismatch for: ${message}`,
+            )
+
+            if (newResult.entities.length > 0) {
+              assert.strictEqual(
+                newResult.entities[0].type,
+                oldResult.entities[0].type,
+                `Type mismatch. New: ${newResult.entities[0].type}, Old: ${oldResult.entities[0].type}`,
+              )
+              assert.strictEqual(
+                newResult.entities[0].value,
+                oldResult.entities[0].value,
+                `Value mismatch. New: ${newResult.entities[0].value}, Old: ${oldResult.entities[0].value}`,
+              )
+              assert.strictEqual(
+                newResult.entities[0].parsedValue,
+                oldResult.entities[0].parsedValue,
+                `Parsed value mismatch`,
+              )
+              assert.strictEqual(
+                newResult.entities[0].inferredType,
+                oldResult.entities[0].inferredType,
+                `Inferred type mismatch`,
+              )
+              assert.strictEqual(
+                newResult.entities[0].formattedValue,
+                oldResult.entities[0].formattedValue,
+                `Formatted value mismatch`,
+              )
+              assert.strictEqual(
+                newResult.entities[0].position,
+                oldResult.entities[0].position,
+                `Position mismatch`,
+              )
+              assert.strictEqual(
+                newResult.entities[0].endPosition,
+                oldResult.entities[0].endPosition,
+                `End position mismatch`,
+              )
+            }
+          },
+        ),
+        { numRuns: 100 },
+      )
+    })
+
+    test('Property 9 (edge case): Type inference remains unchanged', () => {
+      // Generator for numeric values
+      const numericValueArbitrary = fc.integer({ min: -1000, max: 1000 })
+
+      // Generator for boolean values
+      const booleanValueArbitrary = fc.boolean()
+
+      // Generator for string values
+      const stringValueArbitrary = fc
+        .string({
+          minLength: 1,
+          maxLength: 20,
+        })
+        .filter(
+          (s) =>
+            s.trim().length > 0 &&
+            !s.includes('[') &&
+            !s.includes(']') &&
+            !s.includes('"') &&
+            !/^-?\d+(\.\d+)?$/.test(s) && // Not a number
+            !/^(true|false)$/i.test(s), // Not a boolean
+        )
+
+      fc.assert(
+        fc.property(
+          fc.oneof(
+            numericValueArbitrary.map((v) => ({
+              value: String(v),
+              expectedType: 'number' as const,
+            })),
+            booleanValueArbitrary.map((v) => ({
+              value: String(v),
+              expectedType: 'boolean' as const,
+            })),
+            stringValueArbitrary.map((v) => ({
+              value: v,
+              expectedType: 'string' as const,
+            })),
+          ),
+          ({ value, expectedType }) => {
+            // Create parser with new API
+            const newParser = new TaggedStringParser({
+              delimiters: ['[', ']'],
+            })
+
+            // Create parser with old API
+            const oldParser = new TaggedStringParser({
+              openDelimiter: '[',
+              closeDelimiter: ']',
+            })
+
+            const message = `[key:${value}]`
+
+            const newResult = newParser.parse(message)
+            const oldResult = oldParser.parse(message)
+
+            // Property: Type inference should be identical
+            if (
+              newResult.entities.length > 0 &&
+              oldResult.entities.length > 0
+            ) {
+              assert.strictEqual(
+                newResult.entities[0].inferredType,
+                oldResult.entities[0].inferredType,
+                `Type inference mismatch for value: ${value}`,
+              )
+              assert.strictEqual(
+                newResult.entities[0].inferredType,
+                expectedType,
+                `Type inference incorrect for value: ${value}`,
+              )
+            }
+          },
+        ),
+        { numRuns: 100 },
+      )
+    })
+
+    test('Property 9 (edge case): Custom delimiters work identically', () => {
+      // Generator for custom delimiters
+      const delimiterPairArbitrary = fc.constantFrom(
+        ['{{', '}}'],
+        ['<', '>'],
+        ['<<<', '>>>'],
+        ['{', '}'],
+      )
+
+      // Generator for valid keys
+      const keyArbitrary = fc
+        .string({
+          minLength: 1,
+          maxLength: 15,
+        })
+        .filter(
+          (s) =>
+            s.trim().length > 0 &&
+            !s.includes(':') &&
+            !s.includes('"') &&
+            !/\s/.test(s),
+        )
+
+      // Generator for valid values
+      const valueArbitrary = fc
+        .string({
+          minLength: 1,
+          maxLength: 15,
+        })
+        .filter((s) => s.trim().length > 0 && !s.includes('"'))
+
+      fc.assert(
+        fc.property(
+          delimiterPairArbitrary,
+          keyArbitrary,
+          valueArbitrary,
+          ([open, close], key, value) => {
+            // Filter out keys/values that contain the delimiters
+            if (
+              key.includes(open) ||
+              key.includes(close) ||
+              value.includes(open) ||
+              value.includes(close)
+            ) {
+              return
+            }
+
+            // Create parser with new API
+            const newParser = new TaggedStringParser({
+              delimiters: [open, close],
+            })
+
+            // Create parser with old API
+            const oldParser = new TaggedStringParser({
+              openDelimiter: open,
+              closeDelimiter: close,
+            })
+
+            const message = `${open}${key}:${value}${close}`
+
+            const newResult = newParser.parse(message)
+            const oldResult = oldParser.parse(message)
+
+            // Property: Results should be identical
+            assert.strictEqual(
+              newResult.entities.length,
+              oldResult.entities.length,
+              `Entity count mismatch for custom delimiters: ${open}${close}`,
+            )
+
+            if (newResult.entities.length > 0) {
+              assert.strictEqual(
+                newResult.entities[0].type,
+                oldResult.entities[0].type,
+                `Type mismatch with custom delimiters`,
+              )
+              assert.strictEqual(
+                newResult.entities[0].value,
+                oldResult.entities[0].value,
+                `Value mismatch with custom delimiters`,
+              )
+            }
+          },
+        ),
+        { numRuns: 100 },
+      )
+    })
+
+    /**
+     * Feature: delimiter-free-parsing, Property 10: Schema and formatters work in both modes
+     * Validates: Requirements 6.4, 6.5
+     */
+    test('Property 10: Schema and formatters work in both modes', () => {
+      // Generator for entity types
+      const entityTypeArbitrary = fc.constantFrom(
+        'count',
+        'enabled',
+        'name',
+        'price',
+      )
+
+      // Generator for values based on type
+      const valueForTypeArbitrary = (type: string) => {
+        switch (type) {
+          case 'count':
+            return fc.integer({ min: 0, max: 1000 }).map(String)
+          case 'enabled':
+            return fc.boolean().map(String)
+          case 'name':
+            return fc
+              .string({ minLength: 1, maxLength: 20 })
+              .filter(
+                (s) =>
+                  s.trim().length > 0 &&
+                  !s.includes('"') &&
+                  !s.includes('[') &&
+                  !s.includes(']') &&
+                  !/\s/.test(s),
+              )
+          case 'price':
+            return fc
+              .float({ min: 0, max: 1000, noNaN: true })
+              .map((n) => n.toFixed(2))
+          default:
+            return fc.constant('test')
+        }
+      }
+
+      // Define schema with formatters
+      const schema: EntitySchema = {
+        count: {
+          type: 'number',
+          format: (val) => `[${val} items]`,
+        },
+        enabled: {
+          type: 'boolean',
+          format: (val) => (val ? 'YES' : 'NO'),
+        },
+        name: {
+          type: 'string',
+          format: (val) => String(val).toUpperCase(),
+        },
+        price: {
+          type: 'number',
+          format: (val) => `$${val}`,
+        },
+      }
+
+      fc.assert(
+        fc.property(
+          entityTypeArbitrary.chain((type) =>
+            valueForTypeArbitrary(type).map((value) => ({ type, value })),
+          ),
+          ({ type, value }) => {
+            // Test in delimited mode
+            const delimitedParser = new TaggedStringParser({
+              schema,
+              delimiters: ['[', ']'],
+              typeSeparator: '=',
+            })
+
+            const delimitedMessage = `[${type}=${value}]`
+            const delimitedResult = delimitedParser.parse(delimitedMessage)
+
+            // Test in delimiter-free mode
+            const delimiterFreeParser = new TaggedStringParser({
+              schema,
+              delimiters: false,
+              typeSeparator: '=',
+            })
+
+            const delimiterFreeMessage = `${type}=${value}`
+            const delimiterFreeResult =
+              delimiterFreeParser.parse(delimiterFreeMessage)
+
+            // Property: Schema should apply in both modes
+            if (
+              delimitedResult.entities.length > 0 &&
+              delimiterFreeResult.entities.length > 0
+            ) {
+              const delimitedEntity = delimitedResult.entities[0]
+              const delimiterFreeEntity = delimiterFreeResult.entities[0]
+
+              // Type should match
+              assert.strictEqual(
+                delimitedEntity.type,
+                delimiterFreeEntity.type,
+                `Type mismatch for ${type}`,
+              )
+
+              // Inferred type should match schema
+              const schemaEntry = schema[type]
+              const expectedType =
+                typeof schemaEntry === 'string'
+                  ? schemaEntry
+                  : schemaEntry?.type || 'string'
+              assert.strictEqual(
+                delimitedEntity.inferredType,
+                expectedType,
+                `Delimited mode: Schema type not applied for ${type}`,
+              )
+              assert.strictEqual(
+                delimiterFreeEntity.inferredType,
+                expectedType,
+                `Delimiter-free mode: Schema type not applied for ${type}`,
+              )
+
+              // Parsed values should be identical
+              assert.deepStrictEqual(
+                delimitedEntity.parsedValue,
+                delimiterFreeEntity.parsedValue,
+                `Parsed value mismatch for ${type}`,
+              )
+
+              // Formatted values should be identical (formatter applied in both modes)
+              assert.strictEqual(
+                delimitedEntity.formattedValue,
+                delimiterFreeEntity.formattedValue,
+                `Formatted value mismatch for ${type}. Delimited: ${delimitedEntity.formattedValue}, Delimiter-free: ${delimiterFreeEntity.formattedValue}`,
+              )
+            }
+          },
+        ),
+        { numRuns: 100 },
+      )
+    })
+
+    test('Property 10 (edge case): Schema with shorthand syntax works in both modes', () => {
+      // Simple schema with shorthand syntax (just type, no formatter)
+      const schema: EntitySchema = {
+        count: 'number',
+        enabled: 'boolean',
+        name: 'string',
+      }
+
+      // Generator for entity types
+      const entityTypeArbitrary = fc.constantFrom('count', 'enabled', 'name')
+
+      // Generator for values
+      const valueArbitrary = fc.oneof(
+        fc.integer({ min: 0, max: 100 }).map(String),
+        fc.boolean().map(String),
+        fc
+          .string({ minLength: 1, maxLength: 15 })
+          .filter(
+            (s) =>
+              s.trim().length > 0 &&
+              !s.includes('"') &&
+              !s.includes('[') &&
+              !s.includes(']') &&
+              !/\s/.test(s) &&
+              !/^-?\d+$/.test(s) &&
+              !/^(true|false)$/i.test(s),
+          ),
+      )
+
+      fc.assert(
+        fc.property(entityTypeArbitrary, valueArbitrary, (type, value) => {
+          // Test in delimited mode
+          const delimitedParser = new TaggedStringParser({
+            schema,
+            delimiters: ['[', ']'],
+          })
+
+          const delimitedMessage = `[${type}:${value}]`
+          const delimitedResult = delimitedParser.parse(delimitedMessage)
+
+          // Test in delimiter-free mode
+          const delimiterFreeParser = new TaggedStringParser({
+            schema,
+            delimiters: false,
+          })
+
+          const delimiterFreeMessage = `${type}:${value}`
+          const delimiterFreeResult =
+            delimiterFreeParser.parse(delimiterFreeMessage)
+
+          // Property: Schema should apply identically in both modes
+          if (
+            delimitedResult.entities.length > 0 &&
+            delimiterFreeResult.entities.length > 0
+          ) {
+            assert.strictEqual(
+              delimitedResult.entities[0].inferredType,
+              delimiterFreeResult.entities[0].inferredType,
+              `Inferred type mismatch for ${type}:${value}`,
+            )
+
+            assert.deepStrictEqual(
+              delimitedResult.entities[0].parsedValue,
+              delimiterFreeResult.entities[0].parsedValue,
+              `Parsed value mismatch for ${type}:${value}`,
+            )
+          }
+        }),
+        { numRuns: 100 },
+      )
+    })
+
+    test('Property 10 (edge case): Formatters handle edge cases in both modes', () => {
+      // Schema with formatter that handles edge cases
+      const schema: EntitySchema = {
+        value: {
+          type: 'string',
+          format: (val) => {
+            const str = String(val)
+            return str.length > 10 ? `${str.substring(0, 10)}...` : str
+          },
+        },
+      }
+
+      // Generator for values of varying lengths
+      const valueArbitrary = fc
+        .string({ minLength: 0, maxLength: 30 })
+        .filter(
+          (s) =>
+            !s.includes('"') &&
+            !s.includes('[') &&
+            !s.includes(']') &&
+            !/\s/.test(s),
+        )
+
+      fc.assert(
+        fc.property(valueArbitrary, (value) => {
+          if (value.length === 0) return // Skip empty values
+
+          // Test in delimited mode
+          const delimitedParser = new TaggedStringParser({
+            schema,
+            delimiters: ['[', ']'],
+          })
+
+          const delimitedMessage = `[value:${value}]`
+          const delimitedResult = delimitedParser.parse(delimitedMessage)
+
+          // Test in delimiter-free mode
+          const delimiterFreeParser = new TaggedStringParser({
+            schema,
+            delimiters: false,
+          })
+
+          const delimiterFreeMessage = `value:${value}`
+          const delimiterFreeResult =
+            delimiterFreeParser.parse(delimiterFreeMessage)
+
+          // Property: Formatter should produce identical output in both modes
+          if (
+            delimitedResult.entities.length > 0 &&
+            delimiterFreeResult.entities.length > 0
+          ) {
+            assert.strictEqual(
+              delimitedResult.entities[0].formattedValue,
+              delimiterFreeResult.entities[0].formattedValue,
+              `Formatter output mismatch for value: ${value}`,
+            )
+
+            // Verify formatter was actually applied
+            const expected =
+              value.length > 10 ? `${value.substring(0, 10)}...` : value
+            assert.strictEqual(
+              delimitedResult.entities[0].formattedValue,
+              expected,
+              `Formatter not applied correctly in delimited mode`,
+            )
+            assert.strictEqual(
+              delimiterFreeResult.entities[0].formattedValue,
+              expected,
+              `Formatter not applied correctly in delimiter-free mode`,
+            )
+          }
+        }),
+        { numRuns: 100 },
+      )
+    })
+
+    /**
+     * Feature: delimiter-free-parsing, Property 11: Parser continues after malformed entities
+     * Validates: Requirements 8.5
+     */
+    test('Property 11: Parser continues after malformed entities', () => {
+      // Generator for valid keys
+      const validKeyArbitrary = fc
+        .string({
+          minLength: 1,
+          maxLength: 15,
+        })
+        .filter(
+          (s) =>
+            s.trim().length > 0 &&
+            !s.includes('=') &&
+            !s.includes(':') &&
+            !s.includes('"') &&
+            !/\s/.test(s),
+        )
+
+      // Generator for valid values
+      const validValueArbitrary = fc
+        .string({
+          minLength: 1,
+          maxLength: 15,
+        })
+        .filter((s) => s.trim().length > 0 && !s.includes('"') && !/\s/.test(s))
+
+      // Generator for malformed patterns
+      const malformedPatternArbitrary = fc.constantFrom(
+        'key="unclosed', // Unclosed quoted value
+        '"unclosed=value', // Unclosed quoted key
+        'key=', // Missing value
+        '=value', // Missing key
+        'key==value', // Double separator
+      )
+
+      fc.assert(
+        fc.property(
+          malformedPatternArbitrary,
+          validKeyArbitrary,
+          validValueArbitrary,
+          (malformed, validKey, validValue) => {
+            const parser = new TaggedStringParser({
+              delimiters: false,
+              typeSeparator: '=',
+            })
+
+            // Build a message with malformed entity followed by valid entity
+            const message = `${malformed} ${validKey}=${validValue}`
+
+            const result = parser.parse(message)
+
+            // Property: Parser should skip malformed entity and continue to extract valid entity
+            // We should get at least the valid entity (may get more if malformed parts are partially valid)
+            const validEntity = result.entities.find(
+              (e) => e.type === validKey && e.value === validValue,
+            )
+
+            assert.ok(
+              validEntity,
+              `Parser should extract valid entity after malformed pattern. Message: ${message}, Entities: ${JSON.stringify(result.entities)}`,
+            )
+
+            assert.strictEqual(
+              validEntity.type,
+              validKey,
+              `Valid entity type should be preserved`,
+            )
+            assert.strictEqual(
+              validEntity.value,
+              validValue,
+              `Valid entity value should be preserved`,
+            )
+          },
+        ),
+        { numRuns: 100 },
+      )
+    })
+
+    test('Property 11 (edge case): Multiple malformed entities are all skipped', () => {
+      // Generator for valid entity
+      const validEntityArbitrary = fc.tuple(
+        fc
+          .string({ minLength: 1, maxLength: 10 })
+          .filter(
+            (s) =>
+              s.trim().length > 0 &&
+              !s.includes('=') &&
+              !s.includes('"') &&
+              !/\s/.test(s),
+          ),
+        fc
+          .string({ minLength: 1, maxLength: 10 })
+          .filter(
+            (s) => s.trim().length > 0 && !s.includes('"') && !/\s/.test(s),
+          ),
+      )
+
+      // Generator for multiple malformed patterns
+      const malformedArrayArbitrary = fc.array(
+        fc.constantFrom(
+          'bad="unclosed',
+          '"unclosed=val',
+          'empty=',
+          '=nokey',
+          'double==sep',
+        ),
+        { minLength: 1, maxLength: 3 },
+      )
+
+      fc.assert(
+        fc.property(
+          malformedArrayArbitrary,
+          validEntityArbitrary,
+          (malformedPatterns, [validKey, validValue]) => {
+            const parser = new TaggedStringParser({
+              delimiters: false,
+              typeSeparator: '=',
+            })
+
+            // Build message with multiple malformed entities and one valid entity at the end
+            const message = `${malformedPatterns.join(' ')} ${validKey}=${validValue}`
+
+            const result = parser.parse(message)
+
+            // Property: Parser should skip all malformed entities and extract the valid one
+            const validEntity = result.entities.find(
+              (e) => e.type === validKey && e.value === validValue,
+            )
+
+            assert.ok(
+              validEntity,
+              `Parser should extract valid entity after multiple malformed patterns. Message: ${message}`,
+            )
+          },
+        ),
+        { numRuns: 100 },
+      )
+    })
+
+    test('Property 11 (edge case): Malformed entities in delimited mode', () => {
+      // Generator for valid entity (alphanumeric only to avoid special characters)
+      const validEntityArbitrary = fc.tuple(
+        fc.string({ minLength: 1, maxLength: 10 }).filter(
+          (s) =>
+            /^[a-zA-Z0-9]+$/.test(s) && // Only alphanumeric
+            s.trim().length > 0,
+        ),
+        fc.string({ minLength: 1, maxLength: 10 }).filter(
+          (s) =>
+            /^[a-zA-Z0-9]+$/.test(s) && // Only alphanumeric
+            s.trim().length > 0,
+        ),
+      )
+
+      // Generator for malformed delimited patterns that won't interfere with next tag
+      const malformedDelimitedArbitrary = fc.constantFrom(
+        '[]', // Empty tag
+        '[   ]', // Whitespace only
+        '[key:]', // Empty value (this gets skipped)
+      )
+
+      fc.assert(
+        fc.property(
+          malformedDelimitedArbitrary,
+          validEntityArbitrary,
+          (malformed, [validKey, validValue]) => {
+            const parser = new TaggedStringParser({
+              delimiters: ['[', ']'],
+            })
+
+            // Build message with malformed tag followed by valid tag
+            const message = `${malformed} [${validKey}:${validValue}]`
+
+            const result = parser.parse(message)
+
+            // Property: Parser should skip malformed tag and extract valid tag
+            const validEntity = result.entities.find(
+              (e) => e.type === validKey && e.value === validValue,
+            )
+
+            assert.ok(
+              validEntity,
+              `Parser should extract valid tag after malformed tag. Message: ${message}, Entities: ${JSON.stringify(result.entities)}`,
+            )
+          },
+        ),
+        { numRuns: 100 },
+      )
+    })
+
+    test('Property 11 (edge case): Parser returns empty result for all malformed input', () => {
+      // Generator for completely malformed input (no valid entities)
+      const allMalformedArbitrary = fc.array(
+        fc.constantFrom(
+          'key="unclosed',
+          '"unclosed=value',
+          'empty=',
+          '=nokey',
+          'double==sep',
+        ),
+        { minLength: 1, maxLength: 5 },
+      )
+
+      fc.assert(
+        fc.property(allMalformedArbitrary, (malformedPatterns) => {
+          const parser = new TaggedStringParser({
+            delimiters: false,
+            typeSeparator: '=',
+          })
+
+          const message = malformedPatterns.join(' ')
+
+          const result = parser.parse(message)
+
+          // Property: Parser should not crash and should return a valid ParseResult
+          // (may be empty or contain partially extracted entities, but should not throw)
+          assert.ok(result, 'Parser should return a result')
+          assert.ok(
+            Array.isArray(result.entities),
+            'Result should have entities array',
+          )
+          assert.strictEqual(
+            result.originalMessage,
+            message,
+            'Original message should be preserved',
+          )
+        }),
+        { numRuns: 100 },
+      )
+    })
+  })
+
   describe('property-based tests for delimiter-free parsing', () => {
     /**
      * Feature: delimiter-free-parsing, Property 1: Delimiter-free mode extracts key-value patterns
