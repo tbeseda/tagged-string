@@ -156,5 +156,5 @@
   - Update API documentation
   - _Requirements: All_
 
-- [ ] 11. Final checkpoint - Ensure all tests pass
+- [x] 11. Final checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
