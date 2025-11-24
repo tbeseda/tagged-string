@@ -96,32 +96,88 @@ export class TaggedStringParser {
       return this.parseDelimiterFree(message)
     }
 
-    // Escape special regex characters in delimiters
-    const escapeRegex = (str: string) =>
-      str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-    const openEscaped = escapeRegex(this.openDelimiter)
-    const closeEscaped = escapeRegex(this.closeDelimiter)
+    return this.parseDelimited(message)
+  }
 
-    // Build regex to match tags: openDelimiter + content + closeDelimiter
-    const tagRegex = new RegExp(
-      `${openEscaped}([^${closeEscaped}]+?)${closeEscaped}`,
-      'g',
-    )
-
+  /**
+   * Parse a string in delimited mode, extracting tags with proper quoted string handling
+   * @param message - The string to parse
+   * @returns ParseResult containing original message and extracted entities
+   */
+  private parseDelimited(message: string): ParseResult {
     const entities: Entity[] = []
+    let pos = 0
 
-    for (const match of message.matchAll(tagRegex)) {
-      const tagContent = match[1].trim()
+    while (pos < message.length) {
+      // Find the opening delimiter
+      const openIndex = message.indexOf(this.openDelimiter, pos)
+      if (openIndex === -1) {
+        // No more tags
+        break
+      }
 
-      if (tagContent !== '' && match.index !== undefined) {
-        const entity = this.processTag(
-          tagContent,
-          match.index,
-          match.index + match[0].length,
-        )
-        if (entity) {
-          entities.push(entity)
+      // Start scanning for tag content after the opening delimiter
+      const contentStart = openIndex + this.openDelimiter.length
+      let contentEnd = contentStart
+      let inQuote = false
+
+      // Scan character by character to find the closing delimiter
+      // while respecting quoted strings
+      while (contentEnd < message.length) {
+        const char = message[contentEnd]
+
+        if (char === '"') {
+          // Toggle quote state (simplified - doesn't handle escapes during scan)
+          // We'll handle escapes properly in processTag
+          if (contentEnd > contentStart && message[contentEnd - 1] === '\\') {
+            // This is an escaped quote, don't toggle
+            // But we need to check if the backslash itself is escaped
+            let backslashCount = 0
+            let checkPos = contentEnd - 1
+            while (checkPos >= contentStart && message[checkPos] === '\\') {
+              backslashCount++
+              checkPos--
+            }
+            // If odd number of backslashes, the quote is escaped
+            if (backslashCount % 2 === 1) {
+              contentEnd++
+              continue
+            }
+          }
+          inQuote = !inQuote
+          contentEnd++
+        } else if (
+          !inQuote &&
+          message.substring(
+            contentEnd,
+            contentEnd + this.closeDelimiter.length,
+          ) === this.closeDelimiter
+        ) {
+          // Found closing delimiter outside of quotes
+          const tagContent = message.substring(contentStart, contentEnd).trim()
+
+          if (tagContent !== '') {
+            const entity = this.processTag(
+              tagContent,
+              openIndex,
+              contentEnd + this.closeDelimiter.length,
+            )
+            if (entity) {
+              entities.push(entity)
+            }
+          }
+
+          // Move past this tag
+          pos = contentEnd + this.closeDelimiter.length
+          break
+        } else {
+          contentEnd++
         }
+      }
+
+      // If we reached the end without finding a closing delimiter, skip this opening
+      if (contentEnd >= message.length) {
+        pos = openIndex + this.openDelimiter.length
       }
     }
 
@@ -243,20 +299,69 @@ export class TaggedStringParser {
     position: number,
     endPosition: number,
   ): Entity | null {
-    // Find the type separator
-    const separatorIndex = tagContent.indexOf(this.typeSeparator)
-
     let type: string
     let value: string
+    let pos = 0
 
-    if (separatorIndex === -1) {
-      // No separator - treat entire content as value with empty type
-      type = ''
-      value = tagContent
+    // Extract type (key) - can be quoted or unquoted
+    if (tagContent[pos] === '"') {
+      // Quoted key
+      const quotedKey = this.extractQuotedString(tagContent, pos)
+      if (!quotedKey) {
+        // Malformed quoted key - skip this tag
+        return null
+      }
+      type = quotedKey.content
+      pos = quotedKey.endPosition
     } else {
-      // Split by separator
+      // Unquoted key - find separator
+      const separatorIndex = tagContent.indexOf(this.typeSeparator)
+      if (separatorIndex === -1) {
+        // No separator - treat entire content as value with empty type
+        type = ''
+        value = tagContent
+
+        // Parse the value and get typed result
+        const { parsedValue, inferredType } = this.parseValue(type, value)
+
+        // Apply formatter to get formatted value
+        const formattedValue = this.applyFormatter(type, parsedValue)
+
+        return {
+          type,
+          value,
+          parsedValue,
+          formattedValue,
+          inferredType,
+          position,
+          endPosition,
+        }
+      }
       type = tagContent.substring(0, separatorIndex)
-      value = tagContent.substring(separatorIndex + 1)
+      pos = separatorIndex
+    }
+
+    // Check for separator
+    if (pos >= tagContent.length || tagContent[pos] !== this.typeSeparator) {
+      // No separator found after key - malformed
+      return null
+    }
+
+    // Skip separator
+    pos++
+
+    // Extract value - can be quoted or unquoted
+    if (pos < tagContent.length && tagContent[pos] === '"') {
+      // Quoted value
+      const quotedValue = this.extractQuotedString(tagContent, pos)
+      if (!quotedValue) {
+        // Malformed quoted value - skip this tag
+        return null
+      }
+      value = quotedValue.content
+    } else {
+      // Unquoted value - rest of the content
+      value = tagContent.substring(pos)
     }
 
     // Parse the value and get typed result

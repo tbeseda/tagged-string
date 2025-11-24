@@ -97,23 +97,23 @@
   - Test both modes return ParseResult
   - _Requirements: 1.4, 1.5_
 
-- [ ] 7. Add quoted string support to delimited mode
+- [x] 7. Add quoted string support to delimited mode
   - Update `processTag` to handle quoted keys
   - Update `processTag` to handle quoted values
   - Ensure escape sequences work in delimited mode
   - _Requirements: 4.5_
 
-- [ ] 7.1 Write unit tests for quoted strings in delimited mode
+- [x] 7.1 Write unit tests for quoted strings in delimited mode
   - Test quoted keys: `["linux server"=home]`
   - Test quoted values: `[server="web server"]`
   - Test escape sequences in delimited mode
   - _Requirements: 4.5_
 
-- [ ] 7.2 Write property test for quoted string content preservation
+- [x] 7.2 Write property test for quoted string content preservation
   - **Property 4: Quoted strings preserve content**
   - **Validates: Requirements 3.1, 3.2, 3.3, 4.1, 4.2**
 
-- [ ] 7.3 Write property test for quoted keys in both modes
+- [x] 7.3 Write property test for quoted keys in both modes
   - **Property 7: Quoted keys work in both modes**
   - **Validates: Requirements 4.5**
 

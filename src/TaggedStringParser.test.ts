@@ -1118,7 +1118,7 @@ describe('TaggedStringParser', () => {
       )
       assert.strictEqual(result1.entities.length, 4)
       assert.strictEqual(result1.entities[0].parsedValue, 'create')
-      assert.strictEqual(result1.entities[2].parsedValue, '"my-function"')
+      assert.strictEqual(result1.entities[2].parsedValue, 'my-function')
 
       const result2 = parser.parse(
         '[action:create] completed for [resource:RS-123] [externalId:EXT-789]',
@@ -1126,14 +1126,14 @@ describe('TaggedStringParser', () => {
       assert.strictEqual(result2.entities.length, 3)
     })
 
-    test('should preserve quoted values in entity values', () => {
+    test('should extract quoted values without quotes in entity values', () => {
       const parser = new TaggedStringParser()
       const result = parser.parse(
         '[resourceName:"my-function"] [error:"Error message"]',
       )
 
-      assert.strictEqual(result.entities[0].value, '"my-function"')
-      assert.strictEqual(result.entities[1].value, '"Error message"')
+      assert.strictEqual(result.entities[0].value, 'my-function')
+      assert.strictEqual(result.entities[1].value, 'Error message')
     })
 
     test('should parse resource type-specific logs', () => {
@@ -1147,13 +1147,13 @@ describe('TaggedStringParser', () => {
         '[resourceType:function] creating [resourceName:"my-function"]',
       )
       assert.strictEqual(result1.entities[0].parsedValue, 'function')
-      assert.strictEqual(result1.entities[1].parsedValue, '"my-function"')
+      assert.strictEqual(result1.entities[1].parsedValue, 'my-function')
 
       const result2 = parser.parse(
         '[resourceType:database] updating [resourceName:"user-db"]',
       )
       assert.strictEqual(result2.entities[0].parsedValue, 'database')
-      assert.strictEqual(result2.entities[1].parsedValue, '"user-db"')
+      assert.strictEqual(result2.entities[1].parsedValue, 'user-db')
     })
   })
 
@@ -1483,6 +1483,475 @@ describe('TaggedStringParser', () => {
       assert.strictEqual(result1.originalMessage, '')
       assert.strictEqual(result2.entities.length, 0)
       assert.strictEqual(result2.originalMessage, '')
+    })
+  })
+
+  describe('quoted strings in delimited mode', () => {
+    test('should extract quoted key: ["linux server"=home]', () => {
+      const parser = new TaggedStringParser({ typeSeparator: '=' })
+      const result = parser.parse('["linux server"=home]')
+
+      assert.strictEqual(result.entities.length, 1)
+      assert.strictEqual(result.entities[0].type, 'linux server')
+      assert.strictEqual(result.entities[0].value, 'home')
+      assert.strictEqual(result.entities[0].parsedValue, 'home')
+    })
+
+    test('should extract quoted value: [server="web server"]', () => {
+      const parser = new TaggedStringParser({ typeSeparator: '=' })
+      const result = parser.parse('[server="web server"]')
+
+      assert.strictEqual(result.entities.length, 1)
+      assert.strictEqual(result.entities[0].type, 'server')
+      assert.strictEqual(result.entities[0].value, 'web server')
+      assert.strictEqual(result.entities[0].parsedValue, 'web server')
+    })
+
+    test('should extract both quoted key and quoted value', () => {
+      const parser = new TaggedStringParser({ typeSeparator: '=' })
+      const result = parser.parse('["linux server"="web server"]')
+
+      assert.strictEqual(result.entities.length, 1)
+      assert.strictEqual(result.entities[0].type, 'linux server')
+      assert.strictEqual(result.entities[0].value, 'web server')
+      assert.strictEqual(result.entities[0].parsedValue, 'web server')
+    })
+
+    test('should handle escape sequences in quoted key: ["key\\"name"=value]', () => {
+      const parser = new TaggedStringParser({ typeSeparator: '=' })
+      const result = parser.parse('["key\\"name"=value]')
+
+      assert.strictEqual(result.entities.length, 1)
+      assert.strictEqual(result.entities[0].type, 'key"name')
+      assert.strictEqual(result.entities[0].value, 'value')
+    })
+
+    test('should handle escape sequences in quoted value: [key="say \\"hello\\""]', () => {
+      const parser = new TaggedStringParser({ typeSeparator: '=' })
+      const result = parser.parse('[key="say \\"hello\\""]')
+
+      assert.strictEqual(result.entities.length, 1)
+      assert.strictEqual(result.entities[0].type, 'key')
+      assert.strictEqual(result.entities[0].value, 'say "hello"')
+    })
+
+    test('should handle backslash escape sequences: [path="C:\\\\Users\\\\file"]', () => {
+      const parser = new TaggedStringParser({ typeSeparator: '=' })
+      const result = parser.parse('[path="C:\\\\Users\\\\file"]')
+
+      assert.strictEqual(result.entities.length, 1)
+      assert.strictEqual(result.entities[0].type, 'path')
+      assert.strictEqual(result.entities[0].value, 'C:\\Users\\file')
+    })
+
+    test('should handle mixed escape sequences in delimited mode', () => {
+      const parser = new TaggedStringParser({ typeSeparator: '=' })
+      const result = parser.parse('[msg="test\\\\\\"mixed\\""]')
+
+      assert.strictEqual(result.entities.length, 1)
+      assert.strictEqual(result.entities[0].type, 'msg')
+      assert.strictEqual(result.entities[0].value, 'test\\"mixed"')
+    })
+
+    test('should skip malformed tag with unclosed quoted key', () => {
+      const parser = new TaggedStringParser({ typeSeparator: '=' })
+      const result = parser.parse('["unclosed key=value] [valid=123]')
+
+      // Should skip the malformed tag and extract the valid one
+      assert.strictEqual(result.entities.length, 1)
+      assert.strictEqual(result.entities[0].type, 'valid')
+      assert.strictEqual(result.entities[0].value, '123')
+    })
+
+    test('should skip malformed tag with unclosed quoted value', () => {
+      const parser = new TaggedStringParser({ typeSeparator: '=' })
+      const result = parser.parse('[key="unclosed value] [valid=123]')
+
+      // Should skip the malformed tag and extract the valid one
+      assert.strictEqual(result.entities.length, 1)
+      assert.strictEqual(result.entities[0].type, 'valid')
+      assert.strictEqual(result.entities[0].value, '123')
+    })
+
+    test('should handle quoted keys with spaces and special characters', () => {
+      const parser = new TaggedStringParser({ typeSeparator: ':' })
+      const result = parser.parse('["store order":"number 42"]')
+
+      assert.strictEqual(result.entities.length, 1)
+      assert.strictEqual(result.entities[0].type, 'store order')
+      assert.strictEqual(result.entities[0].value, 'number 42')
+    })
+
+    test('should handle quoted values with separator character', () => {
+      const parser = new TaggedStringParser({ typeSeparator: '=' })
+      const result = parser.parse('[formula="a=b+c"]')
+
+      assert.strictEqual(result.entities.length, 1)
+      assert.strictEqual(result.entities[0].type, 'formula')
+      assert.strictEqual(result.entities[0].value, 'a=b+c')
+    })
+
+    test('should work with custom delimiters and quoted strings', () => {
+      const parser = new TaggedStringParser({
+        delimiters: ['{{', '}}'],
+        typeSeparator: '=',
+      })
+      const result = parser.parse('{{"linux server"="web server"}}')
+
+      assert.strictEqual(result.entities.length, 1)
+      assert.strictEqual(result.entities[0].type, 'linux server')
+      assert.strictEqual(result.entities[0].value, 'web server')
+    })
+
+    test('should handle multiple entities with quoted strings', () => {
+      const parser = new TaggedStringParser({ typeSeparator: '=' })
+      const result = parser.parse(
+        '["server name"="web server"] [count=5] ["status"="active"]',
+      )
+
+      assert.strictEqual(result.entities.length, 3)
+      assert.strictEqual(result.entities[0].type, 'server name')
+      assert.strictEqual(result.entities[0].value, 'web server')
+      assert.strictEqual(result.entities[1].type, 'count')
+      assert.strictEqual(result.entities[1].value, '5')
+      assert.strictEqual(result.entities[2].type, 'status')
+      assert.strictEqual(result.entities[2].value, 'active')
+    })
+
+    test('should preserve type inference with quoted values', () => {
+      const parser = new TaggedStringParser({ typeSeparator: '=' })
+      const result = parser.parse('[count="42"] [enabled="true"] [name="test"]')
+
+      assert.strictEqual(result.entities[0].parsedValue, 42)
+      assert.strictEqual(result.entities[0].inferredType, 'number')
+      assert.strictEqual(result.entities[1].parsedValue, true)
+      assert.strictEqual(result.entities[1].inferredType, 'boolean')
+      assert.strictEqual(result.entities[2].parsedValue, 'test')
+      assert.strictEqual(result.entities[2].inferredType, 'string')
+    })
+
+    test('should apply schema with quoted keys', () => {
+      const schema: EntitySchema = {
+        'linux server': 'string',
+        'web server': 'string',
+      }
+      const parser = new TaggedStringParser({ schema, typeSeparator: '=' })
+      const result = parser.parse('["linux server"=home] ["web server"=nginx]')
+
+      assert.strictEqual(result.entities.length, 2)
+      assert.strictEqual(result.entities[0].type, 'linux server')
+      assert.strictEqual(result.entities[0].parsedValue, 'home')
+      assert.strictEqual(result.entities[0].inferredType, 'string')
+      assert.strictEqual(result.entities[1].type, 'web server')
+      assert.strictEqual(result.entities[1].parsedValue, 'nginx')
+      assert.strictEqual(result.entities[1].inferredType, 'string')
+    })
+  })
+
+  describe('property-based tests for quoted strings', () => {
+    /**
+     * Feature: delimiter-free-parsing, Property 4: Quoted strings preserve content
+     * Validates: Requirements 3.1, 3.2, 3.3, 4.1, 4.2
+     */
+    test('Property 4: Quoted strings preserve content', () => {
+      // Generator for content that may contain spaces and special characters
+      const contentArbitrary = fc
+        .string({
+          minLength: 0,
+          maxLength: 50,
+        })
+        .filter((s) => !s.includes('"') && !s.includes('\\'))
+
+      // Test in delimited mode
+      fc.assert(
+        fc.property(contentArbitrary, contentArbitrary, (key, value) => {
+          const parser = new TaggedStringParser({ typeSeparator: '=' })
+
+          // Build a tag with quoted key and value
+          const quotedKey = `"${key}"`
+          const quotedValue = `"${value}"`
+          const message = `[${quotedKey}=${quotedValue}]`
+
+          const result = parser.parse(message)
+
+          // Property: Content should be preserved exactly
+          if (result.entities.length > 0) {
+            assert.strictEqual(
+              result.entities[0].type,
+              key,
+              `Key content not preserved. Expected: "${key}", Got: "${result.entities[0].type}"`,
+            )
+            assert.strictEqual(
+              result.entities[0].value,
+              value,
+              `Value content not preserved. Expected: "${value}", Got: "${result.entities[0].value}"`,
+            )
+          }
+        }),
+        { numRuns: 100 },
+      )
+
+      // Test in delimiter-free mode
+      fc.assert(
+        fc.property(
+          contentArbitrary.filter((s) => s.trim().length > 0),
+          contentArbitrary.filter((s) => s.trim().length > 0),
+          (key, value) => {
+            const parser = new TaggedStringParser({
+              delimiters: false,
+              typeSeparator: '=',
+            })
+
+            // Build a delimiter-free pattern with quoted key and value
+            const quotedKey = `"${key}"`
+            const quotedValue = `"${value}"`
+            const message = `${quotedKey}=${quotedValue}`
+
+            const result = parser.parse(message)
+
+            // Property: Content should be preserved exactly
+            if (result.entities.length > 0) {
+              assert.strictEqual(
+                result.entities[0].type,
+                key,
+                `Key content not preserved in delimiter-free mode. Expected: "${key}", Got: "${result.entities[0].type}"`,
+              )
+              assert.strictEqual(
+                result.entities[0].value,
+                value,
+                `Value content not preserved in delimiter-free mode. Expected: "${value}", Got: "${result.entities[0].value}"`,
+              )
+            }
+          },
+        ),
+        { numRuns: 100 },
+      )
+    })
+
+    test('Property 4 (edge case): Quoted strings with separator characters', () => {
+      // Generator for content that includes separator characters
+      const contentWithSeparatorArbitrary = fc
+        .array(fc.constantFrom('a', 'b', '=', ':', ' ', 'x', 'y'), {
+          minLength: 1,
+          maxLength: 20,
+        })
+        .map((chars) => chars.join(''))
+
+      fc.assert(
+        fc.property(contentWithSeparatorArbitrary, (value) => {
+          const parser = new TaggedStringParser({ typeSeparator: '=' })
+
+          // Build a tag with quoted value containing separator
+          const message = `[key="${value}"]`
+
+          const result = parser.parse(message)
+
+          // Property: Separator characters in quoted values should be preserved
+          assert.strictEqual(result.entities.length, 1)
+          assert.strictEqual(
+            result.entities[0].value,
+            value,
+            `Separator in quoted value not preserved. Expected: "${value}", Got: "${result.entities[0].value}"`,
+          )
+        }),
+        { numRuns: 100 },
+      )
+    })
+
+    test('Property 4 (edge case): Quoted strings with spaces', () => {
+      // Generator for content with multiple spaces
+      const contentWithSpacesArbitrary = fc
+        .array(fc.constantFrom('a', 'b', ' ', 'c', 'd', '  '), {
+          minLength: 1,
+          maxLength: 20,
+        })
+        .map((chars) => chars.join(''))
+
+      fc.assert(
+        fc.property(contentWithSpacesArbitrary, (content) => {
+          const parser = new TaggedStringParser({ typeSeparator: '=' })
+
+          // Test with quoted key
+          const message1 = `["${content}"=value]`
+          const result1 = parser.parse(message1)
+
+          if (result1.entities.length > 0) {
+            assert.strictEqual(
+              result1.entities[0].type,
+              content,
+              `Spaces in quoted key not preserved. Expected: "${content}", Got: "${result1.entities[0].type}"`,
+            )
+          }
+
+          // Test with quoted value
+          const message2 = `[key="${content}"]`
+          const result2 = parser.parse(message2)
+
+          if (result2.entities.length > 0) {
+            assert.strictEqual(
+              result2.entities[0].value,
+              content,
+              `Spaces in quoted value not preserved. Expected: "${content}", Got: "${result2.entities[0].value}"`,
+            )
+          }
+        }),
+        { numRuns: 100 },
+      )
+    })
+
+    /**
+     * Feature: delimiter-free-parsing, Property 7: Quoted keys work in both modes
+     * Validates: Requirements 4.5
+     */
+    test('Property 7: Quoted keys work in both modes', () => {
+      // Generator for keys with spaces (which require quoting)
+      const keyWithSpacesArbitrary = fc
+        .array(fc.constantFrom('a', 'b', ' ', 'c', 'd', 'e'), {
+          minLength: 2,
+          maxLength: 20,
+        })
+        .map((chars) => chars.join(''))
+        .filter((s) => s.includes(' ') && s.trim().length > 0)
+
+      // Generator for simple values (no quotes, no spaces, no delimiters)
+      const simpleValueArbitrary = fc
+        .string({
+          minLength: 1,
+          maxLength: 20,
+        })
+        .filter(
+          (s) =>
+            !s.includes('"') &&
+            !s.includes('\\') &&
+            !/\s/.test(s) &&
+            !s.includes('[') &&
+            !s.includes(']'),
+        )
+
+      fc.assert(
+        fc.property(
+          keyWithSpacesArbitrary,
+          simpleValueArbitrary,
+          (key, value) => {
+            // Test in delimited mode
+            const delimitedParser = new TaggedStringParser({
+              typeSeparator: '=',
+            })
+            const delimitedMessage = `["${key}"=${value}]`
+            const delimitedResult = delimitedParser.parse(delimitedMessage)
+
+            // Property: Quoted key should be extracted in delimited mode
+            assert.strictEqual(
+              delimitedResult.entities.length,
+              1,
+              `Delimited mode should extract entity with quoted key. Message: ${delimitedMessage}`,
+            )
+            assert.strictEqual(
+              delimitedResult.entities[0].type,
+              key,
+              `Delimited mode: Key not preserved. Expected: "${key}", Got: "${delimitedResult.entities[0].type}"`,
+            )
+            assert.strictEqual(
+              delimitedResult.entities[0].value,
+              value,
+              `Delimited mode: Value not preserved. Expected: "${value}", Got: "${delimitedResult.entities[0].value}"`,
+            )
+
+            // Test in delimiter-free mode
+            const delimiterFreeParser = new TaggedStringParser({
+              delimiters: false,
+              typeSeparator: '=',
+            })
+            const delimiterFreeMessage = `"${key}"=${value}`
+            const delimiterFreeResult =
+              delimiterFreeParser.parse(delimiterFreeMessage)
+
+            // Property: Quoted key should be extracted in delimiter-free mode
+            assert.strictEqual(
+              delimiterFreeResult.entities.length,
+              1,
+              `Delimiter-free mode should extract entity with quoted key. Message: ${delimiterFreeMessage}`,
+            )
+            assert.strictEqual(
+              delimiterFreeResult.entities[0].type,
+              key,
+              `Delimiter-free mode: Key not preserved. Expected: "${key}", Got: "${delimiterFreeResult.entities[0].type}"`,
+            )
+            assert.strictEqual(
+              delimiterFreeResult.entities[0].value,
+              value,
+              `Delimiter-free mode: Value not preserved. Expected: "${value}", Got: "${delimiterFreeResult.entities[0].value}"`,
+            )
+          },
+        ),
+        { numRuns: 100 },
+      )
+    })
+
+    test('Property 7 (edge case): Quoted keys with special characters in both modes', () => {
+      // Generator for keys with special characters that would normally break parsing
+      const keyWithSpecialCharsArbitrary = fc
+        .array(fc.constantFrom('a', 'b', '=', ':', ' ', '[', ']', 'x'), {
+          minLength: 2,
+          maxLength: 15,
+        })
+        .map((chars) => chars.join(''))
+        .filter((s) => s.trim().length > 0)
+
+      const simpleValueArbitrary = fc
+        .string({
+          minLength: 1,
+          maxLength: 15,
+        })
+        .filter(
+          (s) =>
+            !s.includes('"') &&
+            !s.includes('\\') &&
+            !/\s/.test(s) &&
+            !s.includes('[') &&
+            !s.includes(']'),
+        )
+
+      fc.assert(
+        fc.property(
+          keyWithSpecialCharsArbitrary,
+          simpleValueArbitrary,
+          (key, value) => {
+            // Test in delimited mode
+            const delimitedParser = new TaggedStringParser({
+              typeSeparator: '=',
+            })
+            const delimitedMessage = `["${key}"=${value}]`
+            const delimitedResult = delimitedParser.parse(delimitedMessage)
+
+            if (delimitedResult.entities.length > 0) {
+              assert.strictEqual(
+                delimitedResult.entities[0].type,
+                key,
+                `Delimited mode: Special chars in key not preserved. Expected: "${key}", Got: "${delimitedResult.entities[0].type}"`,
+              )
+            }
+
+            // Test in delimiter-free mode
+            const delimiterFreeParser = new TaggedStringParser({
+              delimiters: false,
+              typeSeparator: '=',
+            })
+            const delimiterFreeMessage = `"${key}"=${value}`
+            const delimiterFreeResult =
+              delimiterFreeParser.parse(delimiterFreeMessage)
+
+            if (delimiterFreeResult.entities.length > 0) {
+              assert.strictEqual(
+                delimiterFreeResult.entities[0].type,
+                key,
+                `Delimiter-free mode: Special chars in key not preserved. Expected: "${key}", Got: "${delimiterFreeResult.entities[0].type}"`,
+              )
+            }
+          },
+        ),
+        { numRuns: 100 },
+      )
     })
   })
 
