@@ -6,15 +6,20 @@ inclusion: always
 
 ## File Organization
 
-All type definitions belong in `src/types.ts` as the single source of truth. Test files use the `*.test.ts` pattern and live alongside their implementation files. Only export public APIs through `src/index.ts` - keep internal implementations private.
+All type definitions belong in `src/types.ts` as the single source of truth. Test files use the `*.test.ts` pattern and are organized in the `test/` directory. Only export public APIs through `src/index.ts` - keep internal implementations private.
 
 ```
 src/
 ├── types.ts                 # All type definitions
 ├── TaggedStringParser.ts    # Main parser class
 ├── ParseResult.ts           # Result wrapper with utilities
-├── index.ts                 # Public API exports only
-└── *.test.ts                # Co-located tests
+├── TaggedStringGenerator.ts # Tag generation utility
+└── index.ts                 # Public API exports only
+
+test/
+├── TaggedStringParser/      # Parser tests (11 files)
+├── ParseResult.test.ts      # Result wrapper tests
+└── TaggedStringGenerator.test.ts # Generator tests
 ```
 
 ## Architectural Principles
@@ -67,6 +72,8 @@ When adding features or fixing bugs:
 3. Add JSDoc comments to public APIs
 4. Ensure position tracking for all parsed entities
 5. Handle errors silently per the fail-safe strategy
-6. Add tests in co-located `*.test.ts` files
+6. Add tests in the `test/` directory:
+   - TaggedStringParser tests go in `test/TaggedStringParser/`
+   - Other class tests go in `test/` root (e.g., `ParseResult.test.ts`)
 7. Update `TODO.md` if discovering new issues or completing major tasks
 8. Export new public APIs through `src/index.ts` only

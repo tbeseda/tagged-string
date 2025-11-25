@@ -1,7 +1,7 @@
 import assert from 'node:assert'
 import { describe, test } from 'node:test'
-import { ParseResult } from './ParseResult.ts'
-import type { Entity } from './types.ts'
+import { ParseResult } from '../src/ParseResult.ts'
+import type { Entity } from '../src/types.ts'
 
 describe('ParseResult', () => {
   describe('getEntitiesByType', () => {

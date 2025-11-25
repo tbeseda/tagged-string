@@ -1,7 +1,7 @@
 import assert from 'node:assert'
 import { describe, test } from 'node:test'
-import { TaggedStringGenerator } from './TaggedStringGenerator.ts'
-import { TaggedStringParser } from './TaggedStringParser.ts'
+import { TaggedStringGenerator } from '../src/TaggedStringGenerator.ts'
+import { TaggedStringParser } from '../src/TaggedStringParser.ts'
 
 describe('TaggedStringGenerator', () => {
   describe('basic generation with defaults', () => {

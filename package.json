@@ -31,7 +31,7 @@
     "prepublishOnly": "npm run build",
     "lint": "biome check --write",
     "pretest": "npm run typecheck",
-    "test": "node --test src/**/*.test.ts",
+    "test": "node --test 'test/**/*.test.ts'",
     "posttest": "npm run lint",
     "examples": "node src/examples.ts"
   },
