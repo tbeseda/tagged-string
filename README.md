@@ -16,7 +16,7 @@ console.log(result.entities);
 // ]
 ```
 
-The library focuses on parsing - extracting typed entities from plain strings. Generating tagged strings is trivial (just string interpolation); however, there is a `TaggedStringGenerator` class available as a reference or parent for your own implementation.
+The library focuses on parsing — extracting typed entities from plain strings. Generating tagged strings is trivial (just string interpolation), but a `TaggedStringGenerator` class is included as a reference implementation.
 
 ## Installation
 
@@ -72,12 +72,9 @@ result.getAllTypes();                // ['action', 'resource', 'count']
 
 ### Custom Delimiters
 
-Configure the parser to use different delimiters:
-
 ```typescript
 const parser = new TaggedStringParser({
-  openDelimiter: '{{',
-  closeDelimiter: '}}',
+  delimiters: ['{{', '}}'],
   typeSeparator: '=',
   schema: {
     user: { type: 'string', format: (v) => `@${v}` }
@@ -91,7 +88,7 @@ console.log(result.format());
 
 ### Delimiter-Free Mode
 
-Parse key-value patterns without surrounding delimiters:
+Parse `key=value` / `key:value` patterns without surrounding delimiters. Entities are bounded by whitespace:
 
 ```typescript
 const parser = new TaggedStringParser({
@@ -107,73 +104,33 @@ console.log(result.entities);
 // ]
 ```
 
-Delimiter-free mode extracts `key=value` or `key:value` patterns from natural language strings. Entities are identified by whitespace boundaries.
-
-**Unified delimiter configuration:**
-
-```typescript
-// Delimiter-free mode
-new TaggedStringParser({ delimiters: false })
-new TaggedStringParser({ delimiters: [] })
-
-// Delimited mode with custom delimiters
-new TaggedStringParser({ delimiters: ['{{', '}}'] })
-
-// Backward compatible (still works)
-new TaggedStringParser({ openDelimiter: '[', closeDelimiter: ']' })
-```
+The `delimiters` option is unified: `false`/`[]` enables delimiter-free mode, `[open, close]` sets custom delimiters. The legacy `openDelimiter`/`closeDelimiter` options still work.
 
 ### Quoted Strings
 
 Use double quotes to include spaces and special characters in keys or values:
 
 ```typescript
-const parser = new TaggedStringParser({
-  delimiters: false,
-  typeSeparator: '='
-});
+const parser = new TaggedStringParser({ delimiters: false, typeSeparator: '=' });
 
-// Quoted values preserve spaces
-const result1 = parser.parse('order="number 42" was placed');
-console.log(result1.entities[0].value);  // "number 42"
-
-// Quoted keys allow spaces in type names
-const result2 = parser.parse('"store order"=1337 was cancelled');
-console.log(result2.entities[0].type);   // "store order"
-
-// Works in delimited mode too
-const parser2 = new TaggedStringParser({
-  delimiters: ['[', ']'],
-  typeSeparator: '='
-});
-const result3 = parser2.parse('Server ["linux server"=home] is running');
-console.log(result3.entities[0].type);   // "linux server"
+parser.parse('order="number 42" was placed').entities[0].value;    // "number 42"  (spaces in value)
+parser.parse('"store order"=1337 was cancelled').entities[0].type; // "store order" (spaces in key)
 ```
+
+Quoting works in delimited mode too, e.g. `["linux server"=home]`.
 
 ### Escape Sequences
 
-Use backslash to include literal quotes within quoted strings:
+Inside quoted strings, `\"` is a literal quote and `\\` is a literal backslash:
 
 ```typescript
-const parser = new TaggedStringParser({
-  delimiters: false,
-  typeSeparator: '='
-});
+const parser = new TaggedStringParser({ delimiters: false, typeSeparator: '=' });
 
-// Escape quotes with \"
-const result1 = parser.parse('msg="say \\"hello\\"" was sent');
-console.log(result1.entities[0].value);  // 'say "hello"'
-
-// Escape backslashes with \\
-const result2 = parser.parse('path="C:\\\\Users\\\\file.txt" opened');
-console.log(result2.entities[0].value);  // 'C:\Users\file.txt'
+parser.parse('msg="say \\"hello\\"" was sent').entities[0].value;   // 'say "hello"'
+parser.parse('path="C:\\\\Users\\\\file.txt" opened').entities[0].value; // 'C:\Users\file.txt'
 ```
 
-**Supported escape sequences:**
-- `\"` → literal double quote (`"`)
-- `\\` → literal backslash (`\`)
-
-Escape sequences only work inside quoted strings. Backslashes in unquoted text are treated as literal characters.
+Escapes only apply inside quotes; backslashes in unquoted text are literal.
 
 ## API
 
@@ -181,46 +138,33 @@ Escape sequences only work inside quoted strings. Backslashes in unquoted text a
 
 ```typescript
 constructor(config?: ParserConfig)
-```
-
-**Config options:**
-- `delimiters` - Unified delimiter configuration:
-  - `false` or `[]` - Enable delimiter-free mode (parse `key=value` patterns)
-  - `[open, close]` - Use specified delimiters (e.g., `['{{', '}}']`)
-  - If omitted, uses `openDelimiter` and `closeDelimiter` options
-- `openDelimiter` (default: `'['`) - Opening tag delimiter (legacy, use `delimiters` instead)
-- `closeDelimiter` (default: `']'`) - Closing tag delimiter (legacy, use `delimiters` instead)
-- `typeSeparator` (default: `':'`) - Separator between type and value
-- `schema` - Entity type definitions with optional formatters
-
-```typescript
 parse(message: string): ParseResult
 ```
 
-Extracts all tagged entities from the message.
+**Config options:**
+- `delimiters` — `false`/`[]` for delimiter-free mode, or `[open, close]` for custom delimiters. Takes precedence over `openDelimiter`/`closeDelimiter`.
+- `openDelimiter` / `closeDelimiter` (default `'['` / `']'`) — legacy delimiter options.
+- `typeSeparator` (default `':'`) — separator between type and value.
+- `schema` — entity type definitions with optional formatters.
 
 ### `ParseResult`
 
-**Properties:**
-- `originalMessage: string` - The input message
-- `entities: Entity[]` - Extracted entities in order
-
-**Methods:**
-- `getEntitiesByType(type: string): Entity[]` - Filter entities by type
-- `getAllTypes(): string[]` - Get unique entity types
-- `format(): string` - Reconstruct message with formatted values
+- `originalMessage: string` / `entities: Entity[]` — the input and extracted entities (in order).
+- `getEntitiesByType(type: string): Entity[]` — filter by type.
+- `getAllTypes(): string[]` — unique entity types.
+- `format(): string` — reconstruct the message with formatted values.
 
 ### `Entity`
 
 ```typescript
 interface Entity {
-  type: string;                           // Entity type name (can contain spaces if quoted)
-  value: string;                          // Raw string value (quotes removed, escapes processed)
-  parsedValue: string | number | boolean; // Typed value
-  formattedValue: string;                 // Formatted display value
+  type: string;                            // type name (may contain spaces if quoted)
+  value: string;                           // raw value (quotes removed, escapes processed)
+  parsedValue: string | number | boolean;  // typed value
+  formattedValue: string;                   // formatted display value
   inferredType: 'string' | 'number' | 'boolean';
-  position: number;                       // Start position in message
-  endPosition: number;                    // End position in message
+  position: number;                         // start index in the message
+  endPosition: number;                      // end index in the message
 }
 ```
 
@@ -231,202 +175,42 @@ type EntitySchema = Record<string, PrimitiveType | EntityDefinition>;
 
 interface EntityDefinition {
   type: 'string' | 'number' | 'boolean';
-  format?: (value: any) => string;
+  format?: (value: unknown) => string;
 }
 ```
 
 ## Type Inference
 
-Without a schema, the parser infers types automatically:
+Without a schema, the parser infers types:
 
-- **number**: Matches `/^-?\d+(\.\d+)?$/` (integers and decimals)
-- **boolean**: `'true'` or `'false'` (case-insensitive)
-- **string**: Everything else
+- **number** — matches `/^-?\d+(\.\d+)?$/` (integers and decimals)
+- **boolean** — `'true'` or `'false'` (case-insensitive)
+- **string** — everything else
 
 ## Error Handling
 
-The parser is lenient by design:
-
-**Delimited mode:**
-- Malformed tags are skipped
-- Unclosed tags at end of string are ignored
-- Empty tag content is skipped
-
-**Delimiter-free mode:**
-- Unclosed quoted strings are skipped
-- Keys without values are skipped
-- Empty keys or values are skipped
-- Malformed patterns are ignored, parsing continues
-
-**Configuration errors** (throw on construction):
-- Invalid `delimiters` value
-- Empty delimiter strings in delimited mode
-- Same open and close delimiters
-
-## Complete Examples
-
-### Delimited Mode (Traditional)
-
-```typescript
-const parser = new TaggedStringParser({
-  schema: {
-    operation: { type: 'string', format: (v) => v.toUpperCase() },
-    count: { type: 'number', format: (n) => `${n} items` }
-  }
-});
-
-const result = parser.parse('[operation:deploy] completed with [count:42]');
-console.log(result.format());
-// "DEPLOY completed with 42 items"
-```
-
-### Delimiter-Free Mode
-
-```typescript
-const parser = new TaggedStringParser({
-  delimiters: false,
-  typeSeparator: '=',
-  schema: {
-    order: 'number',
-    status: 'string'
-  }
-});
-
-const result = parser.parse('Processing order=1337 with status=pending');
-console.log(result.entities);
-// [
-//   { type: 'order', parsedValue: 1337, inferredType: 'number', ... },
-//   { type: 'status', parsedValue: 'pending', inferredType: 'string', ... }
-// ]
-```
-
-### Quoted Strings with Spaces
-
-```typescript
-const parser = new TaggedStringParser({
-  delimiters: false,
-  typeSeparator: '='
-});
-
-// Quoted values
-const msg1 = 'description="high priority task" created';
-const result1 = parser.parse(msg1);
-console.log(result1.entities[0].value);  // "high priority task"
-
-// Quoted keys
-const msg2 = '"user name"=john logged in';
-const result2 = parser.parse(msg2);
-console.log(result2.entities[0].type);   // "user name"
-
-// Both quoted
-const msg3 = '"store order"="order number 42" processed';
-const result3 = parser.parse(msg3);
-console.log(result3.entities[0].type);   // "store order"
-console.log(result3.entities[0].value);  // "order number 42"
-```
-
-### Escape Sequences
-
-```typescript
-const parser = new TaggedStringParser({
-  delimiters: false,
-  typeSeparator: '='
-});
-
-// Escaped quotes
-const msg1 = 'message="She said \\"hello\\"" sent';
-const result1 = parser.parse(msg1);
-console.log(result1.entities[0].value);  // 'She said "hello"'
-
-// Escaped backslashes
-const msg2 = 'path="C:\\\\Program Files\\\\app.exe" opened';
-const result2 = parser.parse(msg2);
-console.log(result2.entities[0].value);  // 'C:\Program Files\app.exe'
-
-// Mixed escapes
-const msg3 = 'text="Line 1\\nLine 2" contains \\n';
-const result3 = parser.parse(msg3);
-console.log(result3.entities[0].value);  // 'Line 1\nLine 2'
-```
-
-### Mixed Mode Usage
-
-```typescript
-// Delimited mode for structured logs
-const delimitedParser = new TaggedStringParser({
-  delimiters: ['[', ']'],
-  schema: { level: 'string', code: 'number' }
-});
-
-// Delimiter-free for natural language
-const freeParser = new TaggedStringParser({
-  delimiters: false,
-  typeSeparator: '=',
-  schema: { order: 'number', user: 'string' }
-});
-
-const log = delimitedParser.parse('[level:ERROR] [code:500] Server error');
-const event = freeParser.parse('User user=alice placed order=1337');
-
-console.log(log.getEntitiesByType('level')[0].value);    // "ERROR"
-console.log(event.getEntitiesByType('order')[0].value);  // "1337"
-```
+Parsing is lenient and never throws: malformed tags, unclosed tags/quotes, and empty keys or values are skipped, and parsing continues. The constructor throws only on invalid configuration (bad `delimiters`, empty delimiter strings, or identical open/close delimiters).
 
 ## Generating Tagged Strings
 
-While you can create tagged strings with simple string interpolation, `TaggedStringGenerator` provides a reference implementation:
+`TaggedStringGenerator` is a reference implementation for producing tags with consistent delimiters:
 
 ```typescript
 import { TaggedStringGenerator } from 'tagged-string';
 
 const generator = new TaggedStringGenerator();
-
-// Simple tag generation
-const tag = generator.tag('operation', 'deploy');
-// "[operation:deploy]"
-
-// Or just use template literals
-const message = `[operation:deploy] started with [changes:${5}]`;
+generator.tag('operation', 'deploy');      // "[operation:deploy]"
+generator.embed('started ', 'changes', 5); // "started [changes:5]"
 ```
 
-The generator is useful when you need to ensure delimiter consistency across a system.
-
-### `TaggedStringGenerator`
-
-```typescript
-constructor(config?: GeneratorConfig)
-```
-
-**Config options:**
-- `openDelimiter` (default: `'['`) - Opening tag delimiter
-- `closeDelimiter` (default: `']'`) - Closing tag delimiter  
-- `typeSeparator` (default: `':'`) - Separator between type and value
-
-```typescript
-tag(type: string, value: unknown): string
-```
-
-Generates a single tagged entity. Values are converted to strings automatically.
-
-```typescript
-embed(message: string, type: string, value: unknown): string
-```
-
-Convenience method that concatenates a message with a generated tag.
-
-## Examples
-
-Run the included examples:
-
-```bash
-node src/examples.ts
-```
+`constructor(config?: GeneratorConfig)` accepts `openDelimiter`, `closeDelimiter`, and `typeSeparator`. For most cases a template literal (`` `[operation:deploy]` ``) is enough.
 
 ## Development
 
 ```bash
-npm test                    # Run tests
-node src/examples.ts        # Run examples
+npm test              # typecheck, run tests, lint
+npm run build         # compile to dist/ with tsc
+node src/examples.ts  # run the examples
 ```
 
 ## License

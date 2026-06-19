@@ -8,9 +8,7 @@
 import { TaggedStringParser } from './TaggedStringParser.ts'
 import type { EntitySchema } from './types.ts'
 
-// ============================================================================
 // Example 1: Basic Usage with Schema and Simple String Formatters
-// ============================================================================
 
 console.log('=== Example 1: Basic Usage with String Formatters ===\n')
 
@@ -39,9 +37,7 @@ result1.entities.forEach((entity) => {
   console.log(`    Position: ${entity.position}`)
 })
 
-// ============================================================================
 // Example 2: Automatic Type Inference for Unknown Entities
-// ============================================================================
 
 console.log('\n\n=== Example 2: Automatic Type Inference ===\n')
 
@@ -59,9 +55,7 @@ result2.entities.forEach((entity) => {
   console.log(`    Parsed value: ${JSON.stringify(entity.parsedValue)}`)
 })
 
-// ============================================================================
 // Example 3: Entity Filtering by Type
-// ============================================================================
 
 console.log('\n\n=== Example 3: Entity Filtering ===\n')
 
@@ -91,9 +85,7 @@ console.log(
 )
 console.log('Non-existent type:', result3.getEntitiesByType('missing'))
 
-// ============================================================================
 // Example 4: IaC Logging Examples (from design document)
-// ============================================================================
 
 console.log('\n\n=== Example 4: IaC Logging Examples ===\n')
 
@@ -163,16 +155,11 @@ const res3 = iacParser.parse(
 )
 console.log('  ', res3.format())
 
-// ============================================================================
 // Example 5: Custom Configuration (Delimiters with Formatting)
-// ============================================================================
 
 console.log('\n\n=== Example 5: Custom Delimiters with Formatting ===\n')
 
-// This example demonstrates the fix for custom delimiter formatting
-// Previously, format() was hardcoded to use ']' and wouldn't work with custom delimiters
-// Now it correctly uses the configured delimiters to reconstruct messages
-
+// format() reconstructs messages using whatever delimiters were configured.
 const customParser = new TaggedStringParser({
   openDelimiter: '{{',
   closeDelimiter: '}}',
@@ -224,9 +211,7 @@ const parenParser = new TaggedStringParser({
 const parenResult = parenParser.parse('Error (code:404) occurred')
 console.log('  Parentheses:', parenResult.format())
 
-// ============================================================================
 // Example 6: Mixed Known and Unknown Entities
-// ============================================================================
 
 console.log('\n\n=== Example 6: Mixed Known and Unknown Entities ===\n')
 
@@ -249,9 +234,7 @@ result6.entities.forEach((entity) => {
   )
 })
 
-// ============================================================================
 // Example 7: Accessing Entity Properties
-// ============================================================================
 
 console.log('\n\n=== Example 7: Accessing Entity Properties ===\n')
 
@@ -280,9 +263,7 @@ result7.entities.forEach((entity) => {
   console.log(`    position: ${entity.position}`)
 })
 
-// ============================================================================
 // Example 8: Handling Quoted Values
-// ============================================================================
 
 console.log('\n\n=== Example 8: Handling Quoted Values ===\n')
 
@@ -303,9 +284,7 @@ result8.entities.forEach((entity) => {
 })
 
 console.log('\n=== Examples Complete ===\n')
-// ============================================================================
 // Example 9: Producer-Consumer Pattern with Generator
-// ============================================================================
 
 console.log('\n\n=== Example 9: Producer-Consumer Pattern ===\n')
 
@@ -354,9 +333,7 @@ console.log(
 console.log('\n✓ Producer and consumer use matching default configuration')
 console.log('✓ Generated tags are correctly parsed and formatted')
 
-// ============================================================================
 // Example 10: Custom Delimiters with Generator and Parser
-// ============================================================================
 
 console.log('\n\n=== Example 10: Custom Delimiters with Generator ===\n')
 
@@ -405,9 +382,7 @@ console.log(
 console.log('\n✓ Custom delimiters work correctly with generator and parser')
 console.log('✓ Configuration consistency ensures proper round-trip')
 
-// ============================================================================
 // Example 11: Delimiter-Free Mode - Basic Usage
-// ============================================================================
 
 console.log('\n\n=== Example 11: Delimiter-Free Mode - Basic Usage ===\n')
 
@@ -434,9 +409,7 @@ result11.entities.forEach((entity) => {
   )
 })
 
-// ============================================================================
 // Example 12: Delimiter-Free Mode - Natural Language
-// ============================================================================
 
 console.log('\n\n=== Example 12: Delimiter-Free Mode - Natural Language ===\n')
 
@@ -460,9 +433,7 @@ console.log(
   result12.entities.map((e) => `${e.type}=${e.parsedValue}`),
 )
 
-// ============================================================================
 // Example 13: Quoted Values with Spaces
-// ============================================================================
 
 console.log('\n\n=== Example 13: Quoted Values with Spaces ===\n')
 
@@ -489,9 +460,7 @@ result13c.entities.forEach((entity) => {
   console.log(`  - ${entity.type}: "${entity.value}"`)
 })
 
-// ============================================================================
 // Example 14: Quoted Keys with Spaces
-// ============================================================================
 
 console.log('\n\n=== Example 14: Quoted Keys with Spaces ===\n')
 
@@ -521,9 +490,7 @@ console.log(
   `  - "${result14c.entities[0].type}" = "${result14c.entities[0].value}"`,
 )
 
-// ============================================================================
 // Example 15: Escape Sequences
-// ============================================================================
 
 console.log('\n\n=== Example 15: Escape Sequences ===\n')
 
@@ -554,9 +521,7 @@ const result15d = escapeParser.parse('note="ends with backslash\\\\" saved')
 console.log('\nBackslash at end:', result15d.entities[0].value)
 console.log('  ✓ Trailing backslash preserved: ends with backslash\\')
 
-// ============================================================================
 // Example 16: Quoted Strings in Delimited Mode
-// ============================================================================
 
 console.log('\n\n=== Example 16: Quoted Strings in Delimited Mode ===\n')
 
@@ -594,9 +559,7 @@ if (result16c.entities.length > 0) {
   console.log('\nNote: Both quoted in delimited mode requires implementation')
 }
 
-// ============================================================================
 // Example 17: Delimiter-Free vs Delimited Mode Comparison
-// ============================================================================
 
 console.log('\n\n=== Example 17: Mode Comparison ===\n')
 
@@ -635,9 +598,7 @@ console.log(
   delimitedResult2.entities.map((e) => `${e.type}:${e.value}`),
 )
 
-// ============================================================================
 // Example 18: Delimiter-Free with Custom Type Separator
-// ============================================================================
 
 console.log('\n\n=== Example 18: Custom Type Separator ===\n')
 
@@ -654,9 +615,7 @@ console.log(
   result18.entities.map((e) => `${e.type}:${e.value}`),
 )
 
-// ============================================================================
 // Example 19: Error Handling in Delimiter-Free Mode
-// ============================================================================
 
 console.log('\n\n=== Example 19: Error Handling ===\n')
 
@@ -693,9 +652,7 @@ console.log(
 )
 console.log('  ✓ Parser continues after errors')
 
-// ============================================================================
 // Example 20: Real-World Use Case - Log Parsing
-// ============================================================================
 
 console.log('\n\n=== Example 20: Real-World Log Parsing ===\n')
 

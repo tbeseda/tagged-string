@@ -1,9 +1,8 @@
 import type { GeneratorConfig } from './types.ts'
 
 /**
- * Generates tagged strings in the correct format using configured delimiters.
- * Provides a minimal reference implementation for producing tagged strings
- * that can be parsed by TaggedStringParser.
+ * Generates tagged strings with configured delimiters — a reference
+ * implementation for output that TaggedStringParser can read.
  */
 export class TaggedStringGenerator {
   private readonly openDelimiter: string
@@ -11,27 +10,16 @@ export class TaggedStringGenerator {
   private readonly typeSeparator: string
 
   /**
-   * Creates a new TaggedStringGenerator with optional configuration.
-   * Defaults match the parser defaults: [ ] :
-   *
-   * @param config - Optional configuration for delimiters and separator
-   * @throws Error if delimiters are empty or identical
+   * @param config - Delimiters and separator; defaults match the parser (`[`, `]`, `:`).
+   * @throws Error if a delimiter is empty or open and close are identical.
    */
   constructor(config?: GeneratorConfig) {
     this.openDelimiter = config?.openDelimiter ?? '['
     this.closeDelimiter = config?.closeDelimiter ?? ']'
     this.typeSeparator = config?.typeSeparator ?? ':'
-
     this.validateConfig()
   }
 
-  /**
-   * Validates the configuration.
-   * Throws an error if delimiters are invalid.
-   *
-   * @throws Error if openDelimiter or closeDelimiter is empty
-   * @throws Error if openDelimiter equals closeDelimiter
-   */
   private validateConfig(): void {
     if (this.openDelimiter === '') {
       throw new Error('openDelimiter cannot be empty')
@@ -45,46 +33,16 @@ export class TaggedStringGenerator {
   }
 
   /**
-   * Converts any value to its string representation.
-   * Handles null and undefined explicitly.
-   *
-   * @param value - The value to convert
-   * @returns String representation of the value
-   */
-  private valueToString(value: unknown): string {
-    return String(value)
-  }
-
-  /**
-   * Generates a single tagged entity from a type and value.
-   *
-   * @param type - The entity type
-   * @param value - The entity value (will be converted to string)
-   * @returns Formatted tag string
-   * @example
-   * ```ts
-   * const generator = new TaggedStringGenerator()
-   * generator.tag('operation', 'deploy') // Returns: [operation:deploy]
-   * ```
+   * Generate a single tag, e.g. `tag('operation', 'deploy')` → `[operation:deploy]`.
+   * The value is coerced to a string.
    */
   tag(type: string, value: unknown): string {
-    const stringValue = this.valueToString(value)
-    return `${this.openDelimiter}${type}${this.typeSeparator}${stringValue}${this.closeDelimiter}`
+    return `${this.openDelimiter}${type}${this.typeSeparator}${String(value)}${this.closeDelimiter}`
   }
 
   /**
-   * Convenience method for embedding a tag in a message.
-   * Concatenates the message with the generated tag.
-   *
-   * @param message - The message to prepend
-   * @param type - The entity type
-   * @param value - The entity value (will be converted to string)
-   * @returns Message with embedded tag
-   * @example
-   * ```ts
-   * const generator = new TaggedStringGenerator()
-   * generator.embed('Starting ', 'operation', 'deploy') // Returns: Starting [operation:deploy]
-   * ```
+   * Append a tag to a message, e.g. `embed('Starting ', 'operation', 'deploy')`
+   * → `Starting [operation:deploy]`.
    */
   embed(message: string, type: string, value: unknown): string {
     return message + this.tag(type, value)
