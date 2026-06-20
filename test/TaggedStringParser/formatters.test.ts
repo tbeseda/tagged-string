@@ -59,4 +59,45 @@ describe('Formatter Functions', () => {
       assert.strictEqual(result.entities[2].formattedValue, 'test')
     })
   })
+
+  describe('formatter error handling', () => {
+    test('should fall back to String(value) when a formatter throws', () => {
+      const schema: EntitySchema = {
+        operation: {
+          type: 'string',
+          format: () => {
+            throw new Error('boom')
+          },
+        },
+      }
+      const parser = new TaggedStringParser({ schema })
+
+      // parse() must not throw even though the formatter does.
+      const result = parser.parse('[operation:deploy]')
+
+      assert.strictEqual(result.entities[0].formattedValue, 'deploy')
+      assert.strictEqual(result.format(), 'deploy')
+    })
+
+    test('should keep parsing remaining entities after a formatter throws', () => {
+      const schema: EntitySchema = {
+        bad: {
+          type: 'string',
+          format: () => {
+            throw new Error('boom')
+          },
+        },
+        good: {
+          type: 'string',
+          format: (val) => `**${val}**`,
+        },
+      }
+      const parser = new TaggedStringParser({ schema })
+      const result = parser.parse('[bad:x] [good:y]')
+
+      assert.strictEqual(result.entities.length, 2)
+      assert.strictEqual(result.entities[0].formattedValue, 'x')
+      assert.strictEqual(result.entities[1].formattedValue, '**y**')
+    })
+  })
 })

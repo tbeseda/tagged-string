@@ -329,7 +329,6 @@ describe('ParseResult', () => {
       const result = new ParseResult(
         '<operation:OP-123> started with <count:5>',
         entities,
-        '>',
       )
 
       const formatted = result.format()
@@ -361,7 +360,6 @@ describe('ParseResult', () => {
       const result = new ParseResult(
         'User {{user:john}} performed {{count:10}} actions',
         entities,
-        '}}',
       )
 
       const formatted = result.format()
@@ -381,7 +379,7 @@ describe('ParseResult', () => {
           endPosition: 18,
         },
       ]
-      const result = new ParseResult('[operation=OP-123]', entities, ']')
+      const result = new ParseResult('[operation=OP-123]', entities)
 
       const formatted = result.format()
 
@@ -412,7 +410,6 @@ describe('ParseResult', () => {
       const result = new ParseResult(
         '<<operation|OP-123>> started with <<count|5>>',
         entities,
-        '>>',
       )
 
       const formatted = result.format()
@@ -460,11 +457,7 @@ describe('ParseResult', () => {
           endPosition: 27,
         },
       ]
-      const result = new ParseResult(
-        '{user:alice} has {count:42}',
-        entities,
-        '}',
-      )
+      const result = new ParseResult('{user:alice} has {count:42}', entities)
 
       const formatted = result.format()
 
@@ -504,7 +497,6 @@ describe('ParseResult', () => {
       const result = new ParseResult(
         'Start: <a:1> middle <b:2> and <c:3> end',
         entities,
-        '>',
       )
 
       const formatted = result.format()
@@ -536,7 +528,6 @@ describe('ParseResult', () => {
       const result = new ParseResult(
         'User {{user=john}} performed {{count=10}} actions',
         entities,
-        '}}',
       )
 
       const formatted = result.format()

@@ -158,7 +158,7 @@ export class TaggedStringParser {
       }
     }
 
-    return new ParseResult(message, entities, this.closeDelimiter)
+    return new ParseResult(message, entities)
   }
 
   /** Extract bare `key=value` / `key:value` patterns bounded by whitespace. */
@@ -244,7 +244,7 @@ export class TaggedStringParser {
       pos = valueEnd
     }
 
-    return new ParseResult(message, entities, this.closeDelimiter)
+    return new ParseResult(message, entities)
   }
 
   /** Parse a tag's inner content into an Entity, or null if malformed. */
@@ -385,7 +385,12 @@ export class TaggedStringParser {
       const schemaEntry = this.schema[type]
       // Only a full EntityDefinition (not the shorthand string) can carry a formatter.
       if (typeof schemaEntry !== 'string' && schemaEntry.format) {
-        return schemaEntry.format(parsedValue)
+        try {
+          return schemaEntry.format(parsedValue)
+        } catch {
+          // A throwing formatter falls back to the unformatted value (lenient parsing).
+          return String(parsedValue)
+        }
       }
     }
 

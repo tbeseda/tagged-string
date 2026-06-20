@@ -28,12 +28,12 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc",
-    "prepublishOnly": "npm run build",
     "lint": "biome check --write",
     "pretest": "npm run typecheck",
     "test": "node --test 'test/**/*.test.ts'",
     "posttest": "npm run lint",
-    "examples": "node src/examples.ts"
+    "examples": "node src/examples.ts",
+    "release": "npm run build && npx release-it"
   },
   "engines": {
     "node": ">=24.0.0"

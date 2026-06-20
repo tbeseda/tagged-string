@@ -6,4 +6,3 @@ Intentional current behaviors that may warrant options later:
 - **Empty type** — `[:value]` produces an entity with an empty-string type.
 - **Multiple separators** — `[type:value:extra]` splits on the first separator only; the value becomes `value:extra`.
 - **Invalid numbers** — `[count:abc]` with a `number` schema yields `NaN` (no validation).
-- **Formatter errors** — a schema formatter that throws propagates and aborts parsing; errors are not caught.
