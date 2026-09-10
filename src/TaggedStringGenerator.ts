@@ -30,6 +30,39 @@ export class TaggedStringGenerator {
     if (this.openDelimiter === this.closeDelimiter) {
       throw new Error('openDelimiter and closeDelimiter must be different')
     }
+    if (this.typeSeparator.length !== 1) {
+      throw new Error('typeSeparator must be a single character')
+    }
+  }
+
+  private quote(value: string): string {
+    return `"${value.replaceAll('\\', '\\\\').replaceAll('"', '\\"')}"`
+  }
+
+  private encodeType(type: string): string {
+    if (
+      type.includes(this.typeSeparator) ||
+      type.includes(this.closeDelimiter) ||
+      type.includes('"') ||
+      type.trim() !== type
+    ) {
+      return this.quote(type)
+    }
+
+    return type
+  }
+
+  private encodeValue(value: unknown): string {
+    const stringValue = String(value)
+    if (
+      stringValue.includes(this.closeDelimiter) ||
+      stringValue.includes('"') ||
+      stringValue.trim() !== stringValue
+    ) {
+      return this.quote(stringValue)
+    }
+
+    return stringValue
   }
 
   /**
@@ -37,7 +70,7 @@ export class TaggedStringGenerator {
    * The value is coerced to a string.
    */
   tag(type: string, value: unknown): string {
-    return `${this.openDelimiter}${type}${this.typeSeparator}${String(value)}${this.closeDelimiter}`
+    return `${this.openDelimiter}${this.encodeType(type)}${this.typeSeparator}${this.encodeValue(value)}${this.closeDelimiter}`
   }
 
   /**

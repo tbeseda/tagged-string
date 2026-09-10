@@ -62,6 +62,10 @@ export class TaggedStringParser {
 
   /** @throws Error if delimiters are empty or identical (delimited mode only). */
   private validateConfig(): void {
+    if (this.typeSeparator.length !== 1) {
+      throw new Error('Type separator must be a single character')
+    }
+
     if (this.isDelimiterFree) {
       return
     }
