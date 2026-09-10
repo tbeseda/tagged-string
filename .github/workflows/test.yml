@@ -15,3 +15,5 @@ jobs:
           node-version: 24
       - run: npm ci
       - run: npm t
+      - run: npm pack --dry-run
+      - run: node --input-type=module --eval "await import('./dist/index.js')"
