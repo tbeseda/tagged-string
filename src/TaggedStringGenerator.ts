@@ -1,9 +1,6 @@
 import type { GeneratorConfig } from './types.ts'
 
-/**
- * Generates tagged strings with configured delimiters — a reference
- * implementation for output that TaggedStringParser can read.
- */
+/** Generates tagged strings that can be read by a matching parser. */
 export class TaggedStringGenerator {
   private readonly openDelimiter: string
   private readonly closeDelimiter: string
@@ -65,18 +62,12 @@ export class TaggedStringGenerator {
     return stringValue
   }
 
-  /**
-   * Generate a single tag, e.g. `tag('operation', 'deploy')` → `[operation:deploy]`.
-   * The value is coerced to a string.
-   */
+  /** Generate one tag, coercing its value to a string. */
   tag(type: string, value: unknown): string {
     return `${this.openDelimiter}${this.encodeType(type)}${this.typeSeparator}${this.encodeValue(value)}${this.closeDelimiter}`
   }
 
-  /**
-   * Append a tag to a message, e.g. `embed('Starting ', 'operation', 'deploy')`
-   * → `Starting [operation:deploy]`.
-   */
+  /** Append one tag to a message. */
   embed(message: string, type: string, value: unknown): string {
     return message + this.tag(type, value)
   }

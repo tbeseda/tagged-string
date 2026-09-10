@@ -1,216 +1,158 @@
 # Tagged String
 
-Extract structured data from strings using tag-based syntax. Zero dependencies, runs natively on Node.js v24+.
+Extract typed values from tagged text. The package has no runtime dependencies and supports Node.js 24 or later.
 
 ```typescript
-import { TaggedStringParser } from 'tagged-string';
+import { TaggedStringParser } from 'tagged-string'
 
-const parser = new TaggedStringParser();
-const result = parser.parse('[operation:deploy] started with [changes:5] to [stack:prod-stack]');
+const parser = new TaggedStringParser()
+const result = parser.parse(
+  '[operation:deploy] started with [changes:5] to [stack:production]',
+)
 
-console.log(result.entities);
+result.entities.map(({ type, parsedValue }) => ({ type, parsedValue }))
 // [
-//   { type: 'operation', value: 'deploy', parsedValue: 'deploy', inferredType: 'string', ... },
-//   { type: 'changes', value: '5', parsedValue: 5, inferredType: 'number', ... },
-//   { type: 'stack', value: 'prod-stack', parsedValue: 'prod-stack', inferredType: 'string', ... }
+//   { type: 'operation', parsedValue: 'deploy' },
+//   { type: 'changes', parsedValue: 5 },
+//   { type: 'stack', parsedValue: 'production' },
 // ]
 ```
 
-The library focuses on parsing — extracting typed entities from plain strings. Generating tagged strings is trivial (just string interpolation), but a `TaggedStringGenerator` class is included as a reference implementation.
-
-## Installation
+## Install
 
 ```bash
 npm install tagged-string
 ```
 
-Requires Node.js v24 or later for native TypeScript support.
+## Schemas and formatting
 
-## Usage
+Without a schema, values matching `/^-?\d+(\.\d+)?$/` become numbers and `true` or `false` become booleans. Other values remain strings.
 
-### Basic Parsing
-
-The parser extracts `[type:value]` tags from strings and automatically infers types:
-
-```typescript
-const parser = new TaggedStringParser();
-const result = parser.parse('[count:42] items processed, [enabled:true] flag set');
-
-result.entities.forEach(entity => {
-  console.log(entity.type, entity.parsedValue, entity.inferredType);
-});
-// count 42 number
-// enabled true boolean
-```
-
-### Schema-Based Parsing
-
-Define a schema to enforce types and add formatters:
+A schema can select a type and format the value when reconstructing the message:
 
 ```typescript
 const parser = new TaggedStringParser({
   schema: {
-    operation: { type: 'string', format: (v) => v.toUpperCase() },
-    changes: { type: 'number', format: (n) => `${n} changes` },
-    stack: 'string', // shorthand without formatter
-  }
-});
+    operation: {
+      type: 'string',
+      format: (value) => String(value).toUpperCase(),
+    },
+    changes: {
+      type: 'number',
+      format: (value) => `${value} changes`,
+    },
+    stack: 'string',
+  },
+})
 
-const result = parser.parse('[operation:deploy] started with [changes:5] to [stack:prod-stack]');
-console.log(result.format());
-// "DEPLOY started with 5 changes to prod-stack"
+const result = parser.parse(
+  '[operation:deploy] started with [changes:5] to [stack:production]',
+)
+
+result.format()
+// 'DEPLOY started with 5 changes to production'
 ```
 
-### Filtering Entities
+`format()` replaces each tag with its formatted value and preserves the text around it.
 
-```typescript
-const result = parser.parse('[action:create] [resource:function] with [count:3] instances');
+## Custom delimiters
 
-result.getEntitiesByType('action');  // [{ type: 'action', parsedValue: 'create', ... }]
-result.getAllTypes();                // ['action', 'resource', 'count']
-```
-
-### Custom Delimiters
+Use `delimiters` to replace the default `[` and `]`. A type separator must be one nonempty character.
 
 ```typescript
 const parser = new TaggedStringParser({
   delimiters: ['{{', '}}'],
   typeSeparator: '=',
-  schema: {
-    user: { type: 'string', format: (v) => `@${v}` }
-  }
-});
+})
 
-const result = parser.parse('User {{user=john}} performed {{count=10}} actions');
-console.log(result.format());
-// "User @john performed 10 actions"
+parser.parse('User {{name=Taylor}} changed {{count=3}} files').entities
 ```
 
-### Delimiter-Free Mode
+The older `openDelimiter` and `closeDelimiter` options remain available. `delimiters` takes precedence when both forms are provided.
 
-Parse `key=value` / `key:value` patterns without surrounding delimiters. Entities are bounded by whitespace:
+## Delimiter-free parsing
+
+Set `delimiters` to `false` or `[]` to parse whitespace-bounded tokens:
 
 ```typescript
 const parser = new TaggedStringParser({
-  delimiters: false,  // or delimiters: []
-  typeSeparator: '='  // default is ':', use '=' for key=value syntax
-});
+  delimiters: false,
+  typeSeparator: '=',
+})
 
-const result = parser.parse('order=1337 was placed with status=pending');
-console.log(result.entities);
-// [
-//   { type: 'order', value: '1337', parsedValue: 1337, inferredType: 'number', ... },
-//   { type: 'status', value: 'pending', parsedValue: 'pending', inferredType: 'string', ... }
-// ]
+parser.parse('order=1337 status="in progress"').entities
 ```
 
-The `delimiters` option is unified: `false`/`[]` enables delimiter-free mode, `[open, close]` sets custom delimiters. The legacy `openDelimiter`/`closeDelimiter` options still work.
+Double quotes allow spaces or syntax characters in keys and values. Within quotes, `\"` represents a quote and `\\` represents a backslash. Other backslashes remain literal.
 
-### Quoted Strings
+## Generating tags
 
-Use double quotes to include spaces and special characters in keys or values:
+`TaggedStringGenerator` uses the same default delimiters as the parser. It quotes and escapes values when necessary so its output can be parsed with matching configuration.
 
 ```typescript
-const parser = new TaggedStringParser({ delimiters: false, typeSeparator: '=' });
+import { TaggedStringGenerator } from 'tagged-string'
 
-parser.parse('order="number 42" was placed').entities[0].value;    // "number 42"  (spaces in value)
-parser.parse('"store order"=1337 was cancelled').entities[0].type; // "store order" (spaces in key)
+const generator = new TaggedStringGenerator()
+
+generator.tag('operation', 'deploy')
+// '[operation:deploy]'
+
+generator.tag('message', 'wait [here]')
+// '[message:"wait [here]"]'
+
+generator.embed('Starting ', 'changes', 5)
+// 'Starting [changes:5]'
 ```
-
-Quoting works in delimited mode too, e.g. `["linux server"=home]`.
-
-### Escape Sequences
-
-Inside quoted strings, `\"` is a literal quote and `\\` is a literal backslash:
-
-```typescript
-const parser = new TaggedStringParser({ delimiters: false, typeSeparator: '=' });
-
-parser.parse('msg="say \\"hello\\"" was sent').entities[0].value;   // 'say "hello"'
-parser.parse('path="C:\\\\Users\\\\file.txt" opened').entities[0].value; // 'C:\Users\file.txt'
-```
-
-Escapes only apply inside quotes; backslashes in unquoted text are literal.
 
 ## API
 
 ### `TaggedStringParser`
 
 ```typescript
-constructor(config?: ParserConfig)
-parse(message: string): ParseResult
+new TaggedStringParser(config?: ParserConfig)
+parser.parse(message: string): ParseResult
 ```
 
-**Config options:**
-- `delimiters` — `false`/`[]` for delimiter-free mode, or `[open, close]` for custom delimiters. Takes precedence over `openDelimiter`/`closeDelimiter`.
-- `openDelimiter` / `closeDelimiter` (default `'['` / `']'`) — legacy delimiter options.
-- `typeSeparator` (default `':'`) — separator between type and value.
-- `schema` — entity type definitions with optional formatters.
+`ParserConfig` accepts:
+
+- `delimiters`: `[open, close]`, `false`, or `[]`
+- `openDelimiter` and `closeDelimiter`: legacy alternatives to `delimiters`
+- `typeSeparator`: one character, defaulting to `:`
+- `schema`: a record of entity names to primitive types or formatter definitions
+
+Parsing is lenient. Empty and unterminated tags are ignored, and parsing continues when possible. A delimited tag without a type separator, such as `[value]`, produces an entity with an empty type. Constructors throw for invalid configuration.
 
 ### `ParseResult`
 
-- `originalMessage: string` / `entities: Entity[]` — the input and extracted entities (in order).
-- `getEntitiesByType(type: string): Entity[]` — filter by type.
-- `getAllTypes(): string[]` — unique entity types.
-- `format(): string` — reconstruct the message with formatted values.
+- `originalMessage`: the input string
+- `entities`: parsed entities in source order
+- `getEntitiesByType(type)`: entities with the requested type
+- `getAllTypes()`: unique types in source order
+- `format()`: the message with tags replaced by formatted values
 
-### `Entity`
+Each entity contains:
 
 ```typescript
 interface Entity {
-  type: string;                            // type name (may contain spaces if quoted)
-  value: string;                           // raw value (quotes removed, escapes processed)
-  parsedValue: string | number | boolean;  // typed value
-  formattedValue: string;                   // formatted display value
-  inferredType: 'string' | 'number' | 'boolean';
-  position: number;                         // start index in the message
-  endPosition: number;                      // end index in the message
+  type: string
+  value: string
+  parsedValue: string | number | boolean
+  formattedValue: string
+  inferredType: 'string' | 'number' | 'boolean'
+  position: number
+  endPosition: number
 }
 ```
 
-### `EntitySchema`
-
-```typescript
-type EntitySchema = Record<string, PrimitiveType | EntityDefinition>;
-
-interface EntityDefinition {
-  type: 'string' | 'number' | 'boolean';
-  format?: (value: unknown) => string;
-}
-```
-
-## Type Inference
-
-Without a schema, the parser infers types:
-
-- **number** — matches `/^-?\d+(\.\d+)?$/` (integers and decimals)
-- **boolean** — `'true'` or `'false'` (case-insensitive)
-- **string** — everything else
-
-## Error Handling
-
-Parsing is lenient and never throws: malformed tags, unclosed tags/quotes, and empty keys or values are skipped, and parsing continues. The constructor throws only on invalid configuration (bad `delimiters`, empty delimiter strings, or identical open/close delimiters).
-
-## Generating Tagged Strings
-
-`TaggedStringGenerator` is a reference implementation for producing tags with consistent delimiters:
-
-```typescript
-import { TaggedStringGenerator } from 'tagged-string';
-
-const generator = new TaggedStringGenerator();
-generator.tag('operation', 'deploy');      // "[operation:deploy]"
-generator.embed('started ', 'changes', 5); // "started [changes:5]"
-```
-
-`constructor(config?: GeneratorConfig)` accepts `openDelimiter`, `closeDelimiter`, and `typeSeparator`. For most cases a template literal (`` `[operation:deploy]` ``) is enough.
+`value` has surrounding quotes removed and supported escapes decoded. `position` is inclusive; `endPosition` is exclusive.
 
 ## Development
 
 ```bash
-npm test              # typecheck, run tests, lint
-npm run build         # compile to dist/ with tsc
-node src/examples.ts  # run the examples
+npm test          # typecheck, test, and lint
+npm run build     # compile dist
+npm run lint:fix  # apply formatting and lint fixes
+npm run examples  # run the examples
 ```
 
 ## License

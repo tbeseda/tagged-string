@@ -1,97 +1,74 @@
-/**
- * Primitive types supported by the parser
- */
+/** Primitive values produced by the parser. */
 export type PrimitiveType = 'string' | 'number' | 'boolean'
 
-/**
- * Entity definition with optional formatter function
- */
+/** A schema entry with an optional display formatter. */
 export interface EntityDefinition {
   type: PrimitiveType
   format?: (value: unknown) => string
 }
 
-/**
- * Schema mapping entity type names to their definitions
- * Can use shorthand (just the type) or full definition with formatter
- */
+/** Maps entity names to shorthand types or full definitions. */
 export type EntitySchema = Record<string, PrimitiveType | EntityDefinition>
 
 /**
- * Delimiter configuration options
- * - false or []: Enable delimiter-free mode
- * - [open, close]: Use specified delimiters
+ * `false` or `[]` enables delimiter-free mode. A pair supplies custom
+ * opening and closing delimiters.
  */
 export type DelimiterConfig = false | [] | [string, string]
 
-/**
- * Parsed entity extracted from a string
- */
+/** An entity extracted from a message. */
 export interface Entity {
-  /** Entity type name (can contain spaces if quoted) */
+  /** Entity type name. */
   type: string
-  /** Raw string value (quotes removed, escape sequences processed) */
+  /** Decoded string value, before schema conversion. */
   value: string
-  /** Typed value after parsing (string, number, or boolean) */
+  /** Value after inference or schema conversion. */
   parsedValue: string | number | boolean
-  /** Formatted display value (uses schema formatter if available) */
+  /** Schema-formatted value, or `String(parsedValue)`. */
   formattedValue: string
-  /** Inferred or schema-defined type */
+  /** Inferred or schema-defined primitive type. */
   inferredType: PrimitiveType
-  /** The starting position of the entity in the original message */
+  /** Inclusive start offset in the original message. */
   position: number
-  /** The ending position of the entity in the original message */
+  /** Exclusive end offset in the original message. */
   endPosition: number
 }
 
-/**
- * Configuration options for the parser
- */
+/** Parser configuration. */
 export interface ParserConfig {
-  /** Opening tag delimiter (default: '[', legacy option - use delimiters instead) */
+  /** Legacy opening delimiter option. */
   openDelimiter?: string
-  /** Closing tag delimiter (default: ']', legacy option - use delimiters instead) */
+  /** Legacy closing delimiter option. */
   closeDelimiter?: string
-  /** Separator between type and value (default: ':') */
+  /** One-character separator between type and value. Defaults to `:`. */
   typeSeparator?: string
-  /** Entity type definitions with optional formatters */
+  /** Entity definitions and formatters. */
   schema?: EntitySchema
   /**
-   * Unified delimiter configuration (takes precedence over openDelimiter/closeDelimiter):
-   * - false or [] enables delimiter-free mode (parse key=value patterns)
-   * - [open, close] uses specified delimiters (e.g., ['{{', '}}'])
+   * Custom delimiters or delimiter-free mode. Takes precedence over the
+   * legacy delimiter options.
    */
   delimiters?: DelimiterConfig
 }
 
-/**
- * Configuration options for the generator
- */
+/** Generator configuration. */
 export interface GeneratorConfig {
   openDelimiter?: string
   closeDelimiter?: string
   typeSeparator?: string
 }
 
-/**
- * Result of parsing a string
- */
+/** A parsed message and its entities. */
 export interface ParseResult {
   originalMessage: string
   entities: Entity[]
 
-  /**
-   * Get all entities of a specific type
-   */
+  /** Return entities with the requested type. */
   getEntitiesByType(type: string): Entity[]
 
-  /**
-   * Get all unique entity types found in the message
-   */
+  /** Return unique entity types in source order. */
   getAllTypes(): string[]
 
-  /**
-   * Reconstruct the message with formatted entity values
-   */
+  /** Replace tags with their formatted values. */
   format(): string
 }

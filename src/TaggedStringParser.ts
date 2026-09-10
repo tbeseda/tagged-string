@@ -6,15 +6,7 @@ import type {
   PrimitiveType,
 } from './types.ts'
 
-/**
- * Extracts tagged entities from strings in two modes:
- * - Delimited: tags wrapped in delimiters, e.g. `[key:value]`
- * - Delimiter-free: bare `key=value` patterns split on whitespace
- *
- * Supports custom delimiters/separators, schema-based typing with formatters,
- * type inference, quoted strings with `\"`/`\\` escapes, and lenient parsing
- * (malformed entities are skipped).
- */
+/** Extracts typed entities from delimited or whitespace-bounded tags. */
 export class TaggedStringParser {
   private readonly openDelimiter: string
   private readonly closeDelimiter: string
@@ -81,7 +73,7 @@ export class TaggedStringParser {
     }
   }
 
-  /** Parse a message and extract all tagged entities. */
+  /** Parse a message and return its tagged entities. */
   parse(message: string): ParseResult {
     if (message === '') {
       return new ParseResult(message, [])
@@ -94,7 +86,6 @@ export class TaggedStringParser {
     return this.parseDelimited(message)
   }
 
-  /** Extract `[key:value]`-style tags, respecting quoted strings. */
   private parseDelimited(message: string): ParseResult {
     const entities: Entity[] = []
     let pos = 0
@@ -206,7 +197,6 @@ export class TaggedStringParser {
     return backslashCount % 2 === 1
   }
 
-  /** Extract bare `key=value` / `key:value` patterns bounded by whitespace. */
   private parseDelimiterFree(message: string): ParseResult {
     const entities: Entity[] = []
     let pos = 0
@@ -292,7 +282,6 @@ export class TaggedStringParser {
     return new ParseResult(message, entities)
   }
 
-  /** Parse a tag's inner content into an Entity, or null if malformed. */
   private processTag(
     tagContent: string,
     position: number,
@@ -365,7 +354,6 @@ export class TaggedStringParser {
     }
   }
 
-  /** Infer a primitive type from a raw value: number, boolean, else string. */
   private inferType(value: string): PrimitiveType {
     if (/^-?\d+(\.\d+)?$/.test(value)) {
       return 'number'
@@ -379,7 +367,6 @@ export class TaggedStringParser {
     return 'string'
   }
 
-  /** Resolve a value's type (schema if present, else inferred) and parse it. */
   private parseValue(
     type: string,
     rawValue: string,
@@ -421,7 +408,6 @@ export class TaggedStringParser {
     }
   }
 
-  /** Apply the schema formatter for a type, or fall back to `String(value)`. */
   private applyFormatter(
     type: string,
     parsedValue: string | number | boolean,
@@ -484,10 +470,6 @@ export class TaggedStringParser {
     return null
   }
 
-  /**
-   * Extract an unquoted token from `startPos`, stopping at whitespace or any
-   * character in `stopChars`.
-   */
   private extractUnquotedToken(
     message: string,
     startPos: number,
