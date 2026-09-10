@@ -108,61 +108,102 @@ export class TaggedStringParser {
       const contentStart = openIndex + this.openDelimiter.length
       let contentEnd = contentStart
       let inQuote = false
+      let recoveryStart = -1
+      let recoveryContentStart = -1
+      let recoveryInQuote = false
+      const recoveredEntities: Entity[] = []
 
-      // Scan to the closing delimiter, ignoring delimiters inside quotes.
       while (contentEnd < message.length) {
         const char = message[contentEnd]
 
         if (char === '"') {
-          // A quote is escaped only if preceded by an odd number of backslashes.
-          if (contentEnd > contentStart && message[contentEnd - 1] === '\\') {
-            let backslashCount = 0
-            let checkPos = contentEnd - 1
-            while (checkPos >= contentStart && message[checkPos] === '\\') {
-              backslashCount++
-              checkPos--
-            }
-            if (backslashCount % 2 === 1) {
-              contentEnd++
-              continue
-            }
+          if (!this.isEscapedQuote(message, contentEnd, contentStart)) {
+            inQuote = !inQuote
           }
-          inQuote = !inQuote
+          if (
+            recoveryStart !== -1 &&
+            !this.isEscapedQuote(message, contentEnd, recoveryContentStart)
+          ) {
+            recoveryInQuote = !recoveryInQuote
+          }
           contentEnd++
-        } else if (
-          !inQuote &&
-          message.substring(
-            contentEnd,
-            contentEnd + this.closeDelimiter.length,
-          ) === this.closeDelimiter
+          continue
+        }
+
+        if (
+          inQuote &&
+          recoveryStart === -1 &&
+          message.startsWith(this.openDelimiter, contentEnd)
         ) {
+          recoveryStart = contentEnd
+          recoveryContentStart = contentEnd + this.openDelimiter.length
+          recoveryInQuote = false
+          contentEnd = recoveryContentStart
+          continue
+        }
+
+        if (message.startsWith(this.closeDelimiter, contentEnd)) {
+          const endPosition = contentEnd + this.closeDelimiter.length
+
+          if (inQuote) {
+            if (recoveryStart !== -1 && !recoveryInQuote) {
+              const recoveredContent = message
+                .substring(recoveryContentStart, contentEnd)
+                .trim()
+              if (recoveredContent !== '') {
+                const recoveredEntity = this.processTag(
+                  recoveredContent,
+                  recoveryStart,
+                  endPosition,
+                )
+                if (recoveredEntity) {
+                  recoveredEntities.push(recoveredEntity)
+                }
+              }
+              recoveryStart = -1
+              recoveryContentStart = -1
+            }
+            contentEnd = endPosition
+            continue
+          }
+
           const tagContent = message.substring(contentStart, contentEnd).trim()
 
           if (tagContent !== '') {
-            const entity = this.processTag(
-              tagContent,
-              openIndex,
-              contentEnd + this.closeDelimiter.length,
-            )
+            const entity = this.processTag(tagContent, openIndex, endPosition)
             if (entity) {
               entities.push(entity)
             }
           }
 
-          pos = contentEnd + this.closeDelimiter.length
+          pos = endPosition
           break
-        } else {
-          contentEnd++
         }
+
+        contentEnd++
       }
 
-      // Unterminated tag: skip past the opening delimiter and keep scanning.
       if (contentEnd >= message.length) {
-        pos = openIndex + this.openDelimiter.length
+        entities.push(...recoveredEntities)
+        break
       }
     }
 
     return new ParseResult(message, entities)
+  }
+
+  private isEscapedQuote(
+    message: string,
+    quotePosition: number,
+    contentStart: number,
+  ): boolean {
+    let backslashCount = 0
+    let pos = quotePosition - 1
+    while (pos >= contentStart && message[pos] === '\\') {
+      backslashCount++
+      pos--
+    }
+    return backslashCount % 2 === 1
   }
 
   /** Extract bare `key=value` / `key:value` patterns bounded by whitespace. */
