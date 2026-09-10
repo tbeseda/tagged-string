@@ -376,7 +376,7 @@ export class TaggedStringParser {
   } {
     let targetType: PrimitiveType
 
-    if (this.schema && type in this.schema) {
+    if (this.schema && Object.hasOwn(this.schema, type)) {
       const schemaEntry = this.schema[type]
       // Schema entries are either a shorthand type string or a full definition.
       targetType =
@@ -412,7 +412,7 @@ export class TaggedStringParser {
     type: string,
     parsedValue: string | number | boolean,
   ): string {
-    if (this.schema && type in this.schema) {
+    if (this.schema && Object.hasOwn(this.schema, type)) {
       const schemaEntry = this.schema[type]
       // Only a full EntityDefinition (not the shorthand string) can carry a formatter.
       if (typeof schemaEntry !== 'string' && schemaEntry.format) {
