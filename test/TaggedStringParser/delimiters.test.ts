@@ -104,6 +104,20 @@ describe('Delimiter Configuration', () => {
         /Open and close delimiters cannot be the same/,
       )
     })
+
+    test('should reject an empty type separator', () => {
+      assert.throws(
+        () => new TaggedStringParser({ typeSeparator: '' }),
+        /Type separator must be a single character/,
+      )
+    })
+
+    test('should reject a multi-character type separator', () => {
+      assert.throws(
+        () => new TaggedStringParser({ typeSeparator: '::' }),
+        /Type separator must be a single character/,
+      )
+    })
   })
 
   describe('configuration resolution', () => {

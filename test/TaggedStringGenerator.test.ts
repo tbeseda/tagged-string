@@ -128,7 +128,7 @@ describe('TaggedStringGenerator', () => {
       const generator = new TaggedStringGenerator()
       const result = generator.tag('data', { key: 'value' })
 
-      assert.strictEqual(result, '[data:[object Object]]')
+      assert.strictEqual(result, '[data:"[object Object]"]')
     })
 
     test('should convert array to string', () => {
@@ -197,14 +197,14 @@ describe('TaggedStringGenerator', () => {
       const generator = new TaggedStringGenerator()
       const result = generator.tag('message', '  spaces  ')
 
-      assert.strictEqual(result, '[message:  spaces  ]')
+      assert.strictEqual(result, '[message:"  spaces  "]')
     })
 
     test('should handle delimiter characters in values', () => {
       const generator = new TaggedStringGenerator()
       const result = generator.tag('message', 'value [with] brackets')
 
-      assert.strictEqual(result, '[message:value [with] brackets]')
+      assert.strictEqual(result, '[message:"value [with] brackets"]')
     })
 
     test('should handle type separator in values', () => {
@@ -310,6 +310,35 @@ describe('TaggedStringGenerator', () => {
       assert.strictEqual(result.entities[0].value, 'true')
       assert.strictEqual(result.entities[0].parsedValue, true)
     })
+
+    test('should preserve values containing delimiters and quotes', () => {
+      const generator = new TaggedStringGenerator()
+      const parser = new TaggedStringParser()
+      const value = 'say "hello" [again] \\'
+
+      const result = parser.parse(generator.tag('message', value))
+
+      assert.strictEqual(result.entities[0].value, value)
+    })
+
+    test('should preserve leading and trailing whitespace', () => {
+      const generator = new TaggedStringGenerator()
+      const parser = new TaggedStringParser()
+
+      const result = parser.parse(generator.tag('message', '  spaced  '))
+
+      assert.strictEqual(result.entities[0].value, '  spaced  ')
+    })
+
+    test('should preserve separator characters in types', () => {
+      const generator = new TaggedStringGenerator()
+      const parser = new TaggedStringParser()
+
+      const result = parser.parse(generator.tag('namespaced:type', 'value'))
+
+      assert.strictEqual(result.entities[0].type, 'namespaced:type')
+      assert.strictEqual(result.entities[0].value, 'value')
+    })
   })
 
   describe('configuration validation', () => {
@@ -338,11 +367,18 @@ describe('TaggedStringGenerator', () => {
       )
     })
 
-    test('should allow empty typeSeparator', () => {
-      const generator = new TaggedStringGenerator({ typeSeparator: '' })
-      const result = generator.tag('operation', 'deploy')
+    test('should reject an empty typeSeparator', () => {
+      assert.throws(
+        () => new TaggedStringGenerator({ typeSeparator: '' }),
+        /typeSeparator must be a single character/,
+      )
+    })
 
-      assert.strictEqual(result, '[operationdeploy]')
+    test('should reject a multi-character typeSeparator', () => {
+      assert.throws(
+        () => new TaggedStringGenerator({ typeSeparator: '::' }),
+        /typeSeparator must be a single character/,
+      )
     })
   })
 })

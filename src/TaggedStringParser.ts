@@ -6,15 +6,7 @@ import type {
   PrimitiveType,
 } from './types.ts'
 
-/**
- * Extracts tagged entities from strings in two modes:
- * - Delimited: tags wrapped in delimiters, e.g. `[key:value]`
- * - Delimiter-free: bare `key=value` patterns split on whitespace
- *
- * Supports custom delimiters/separators, schema-based typing with formatters,
- * type inference, quoted strings with `\"`/`\\` escapes, and lenient parsing
- * (malformed entities are skipped).
- */
+/** Extracts typed entities from delimited or whitespace-bounded tags. */
 export class TaggedStringParser {
   private readonly openDelimiter: string
   private readonly closeDelimiter: string
@@ -62,6 +54,10 @@ export class TaggedStringParser {
 
   /** @throws Error if delimiters are empty or identical (delimited mode only). */
   private validateConfig(): void {
+    if (this.typeSeparator.length !== 1) {
+      throw new Error('Type separator must be a single character')
+    }
+
     if (this.isDelimiterFree) {
       return
     }
@@ -77,7 +73,7 @@ export class TaggedStringParser {
     }
   }
 
-  /** Parse a message and extract all tagged entities. */
+  /** Parse a message and return its tagged entities. */
   parse(message: string): ParseResult {
     if (message === '') {
       return new ParseResult(message, [])
@@ -90,7 +86,6 @@ export class TaggedStringParser {
     return this.parseDelimited(message)
   }
 
-  /** Extract `[key:value]`-style tags, respecting quoted strings. */
   private parseDelimited(message: string): ParseResult {
     const entities: Entity[] = []
     let pos = 0
@@ -104,64 +99,104 @@ export class TaggedStringParser {
       const contentStart = openIndex + this.openDelimiter.length
       let contentEnd = contentStart
       let inQuote = false
+      let recoveryStart = -1
+      let recoveryContentStart = -1
+      let recoveryInQuote = false
+      const recoveredEntities: Entity[] = []
 
-      // Scan to the closing delimiter, ignoring delimiters inside quotes.
       while (contentEnd < message.length) {
         const char = message[contentEnd]
 
         if (char === '"') {
-          // A quote is escaped only if preceded by an odd number of backslashes.
-          if (contentEnd > contentStart && message[contentEnd - 1] === '\\') {
-            let backslashCount = 0
-            let checkPos = contentEnd - 1
-            while (checkPos >= contentStart && message[checkPos] === '\\') {
-              backslashCount++
-              checkPos--
-            }
-            if (backslashCount % 2 === 1) {
-              contentEnd++
-              continue
-            }
+          if (!this.isEscapedQuote(message, contentEnd, contentStart)) {
+            inQuote = !inQuote
           }
-          inQuote = !inQuote
+          if (
+            recoveryStart !== -1 &&
+            !this.isEscapedQuote(message, contentEnd, recoveryContentStart)
+          ) {
+            recoveryInQuote = !recoveryInQuote
+          }
           contentEnd++
-        } else if (
-          !inQuote &&
-          message.substring(
-            contentEnd,
-            contentEnd + this.closeDelimiter.length,
-          ) === this.closeDelimiter
+          continue
+        }
+
+        if (
+          inQuote &&
+          recoveryStart === -1 &&
+          message.startsWith(this.openDelimiter, contentEnd)
         ) {
+          recoveryStart = contentEnd
+          recoveryContentStart = contentEnd + this.openDelimiter.length
+          recoveryInQuote = false
+          contentEnd = recoveryContentStart
+          continue
+        }
+
+        if (message.startsWith(this.closeDelimiter, contentEnd)) {
+          const endPosition = contentEnd + this.closeDelimiter.length
+
+          if (inQuote) {
+            if (recoveryStart !== -1 && !recoveryInQuote) {
+              const recoveredContent = message
+                .substring(recoveryContentStart, contentEnd)
+                .trim()
+              if (recoveredContent !== '') {
+                const recoveredEntity = this.processTag(
+                  recoveredContent,
+                  recoveryStart,
+                  endPosition,
+                )
+                if (recoveredEntity) {
+                  recoveredEntities.push(recoveredEntity)
+                }
+              }
+              recoveryStart = -1
+              recoveryContentStart = -1
+            }
+            contentEnd = endPosition
+            continue
+          }
+
           const tagContent = message.substring(contentStart, contentEnd).trim()
 
           if (tagContent !== '') {
-            const entity = this.processTag(
-              tagContent,
-              openIndex,
-              contentEnd + this.closeDelimiter.length,
-            )
+            const entity = this.processTag(tagContent, openIndex, endPosition)
             if (entity) {
               entities.push(entity)
             }
           }
 
-          pos = contentEnd + this.closeDelimiter.length
+          pos = endPosition
           break
-        } else {
-          contentEnd++
         }
+
+        contentEnd++
       }
 
-      // Unterminated tag: skip past the opening delimiter and keep scanning.
       if (contentEnd >= message.length) {
-        pos = openIndex + this.openDelimiter.length
+        entities.push(...recoveredEntities)
+        break
       }
     }
 
     return new ParseResult(message, entities)
   }
 
-  /** Extract bare `key=value` / `key:value` patterns bounded by whitespace. */
+  private isEscapedQuote(
+    message: string,
+    quotePosition: number,
+    contentStart: number,
+  ): boolean {
+    let backslashCount = 0
+    let pos = quotePosition - 1
+    while (pos >= contentStart && message[pos] === '\\') {
+      backslashCount++
+      pos--
+    }
+    return backslashCount % 2 === 1
+  }
+
   private parseDelimiterFree(message: string): ParseResult {
     const entities: Entity[] = []
     let pos = 0
@@ -247,7 +282,6 @@ export class TaggedStringParser {
     return new ParseResult(message, entities)
   }
 
-  /** Parse a tag's inner content into an Entity, or null if malformed. */
   private processTag(
     tagContent: string,
     position: number,
@@ -320,7 +354,6 @@ export class TaggedStringParser {
     }
   }
 
-  /** Infer a primitive type from a raw value: number, boolean, else string. */
   private inferType(value: string): PrimitiveType {
     if (/^-?\d+(\.\d+)?$/.test(value)) {
       return 'number'
@@ -334,7 +367,6 @@ export class TaggedStringParser {
     return 'string'
   }
 
-  /** Resolve a value's type (schema if present, else inferred) and parse it. */
   private parseValue(
     type: string,
     rawValue: string,
@@ -344,7 +376,7 @@ export class TaggedStringParser {
   } {
     let targetType: PrimitiveType
 
-    if (this.schema && type in this.schema) {
+    if (this.schema && Object.hasOwn(this.schema, type)) {
       const schemaEntry = this.schema[type]
       // Schema entries are either a shorthand type string or a full definition.
       targetType =
@@ -376,12 +408,11 @@ export class TaggedStringParser {
     }
   }
 
-  /** Apply the schema formatter for a type, or fall back to `String(value)`. */
   private applyFormatter(
     type: string,
     parsedValue: string | number | boolean,
   ): string {
-    if (this.schema && type in this.schema) {
+    if (this.schema && Object.hasOwn(this.schema, type)) {
       const schemaEntry = this.schema[type]
       // Only a full EntityDefinition (not the shorthand string) can carry a formatter.
       if (typeof schemaEntry !== 'string' && schemaEntry.format) {
@@ -439,10 +470,6 @@ export class TaggedStringParser {
     return null
   }
 
-  /**
-   * Extract an unquoted token from `startPos`, stopping at whitespace or any
-   * character in `stopChars`.
-   */
   private extractUnquotedToken(
     message: string,
     startPos: number,

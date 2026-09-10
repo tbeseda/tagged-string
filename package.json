@@ -14,21 +14,18 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "default": "./dist/index.js"
-    },
-    "./src": {
-      "types": "./src/index.ts",
-      "default": "./src/index.ts"
+      "import": "./dist/index.js"
     }
   },
   "files": [
-    "dist",
-    "src"
+    "dist"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "typecheck": "tsc",
-    "lint": "biome check --write",
+    "typecheck": "tsc && tsc -p tsconfig.test.json",
+    "lint": "biome check",
+    "lint:fix": "biome check --write",
+    "prepack": "npm run build",
     "pretest": "npm run typecheck",
     "test": "node --test 'test/**/*.test.ts'",
     "posttest": "npm run lint",
@@ -39,8 +36,8 @@
     "node": ">=24.0.0"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.5.0",
+    "@biomejs/biome": "2.5.13",
     "@types/node": "^26.0.0",
-    "typescript": "^6.0.3"
+    "typescript": "^7.0.2"
   }
 }

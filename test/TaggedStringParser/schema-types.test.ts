@@ -110,6 +110,14 @@ describe('Schema and Type Inference', () => {
       assert.strictEqual(result.entities[2].parsedValue, 42)
       assert.strictEqual(result.entities[2].inferredType, 'number')
     })
+
+    test('should ignore properties inherited by the schema', () => {
+      const parser = new TaggedStringParser({ schema: {} })
+      const result = parser.parse('[toString:42]')
+
+      assert.strictEqual(result.entities[0].parsedValue, 42)
+      assert.strictEqual(result.entities[0].inferredType, 'number')
+    })
   })
 
   describe('shorthand vs full EntityDefinition', () => {
